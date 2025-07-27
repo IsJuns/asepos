@@ -1,129 +1,192 @@
 <script setup lang="ts">
-import { GalleryVerticalEnd } from 'lucide-vue-next'
-
+import { 
+Home, 
+Users, 
+FileText, 
+BarChart3, 
+Settings, 
+LogOut, 
+Building2,
+ChevronDown,
+MapPin
+} from "lucide-vue-next"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  type SidebarProps,
-  SidebarRail,
-} from '@/components/ui/sidebar'
+Sidebar,
+SidebarContent,
+SidebarGroup,
+SidebarGroupContent,
+SidebarGroupLabel,
+SidebarHeader,
+SidebarMenu,
+SidebarMenuButton,
+SidebarMenuItem,
+} from "@/components/ui/sidebar"
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuItem,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-const props = defineProps<SidebarProps>()
-
-// This is sample data.
-const data = {
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/",
-      items: [
-        {
-          title: "Input Data Warga",
-          url: "/inputData"
-        },
-        {
-          title: "Output Data",
-          url: "/outputData"
-        }
-
-      ]
-    },
-    
-    {
-      title: 'API Reference',
-      url: '#',
-      items: [
-        {
-          title: 'Components',
-          url: '#',
-        },
-        // {
-        //   title: 'File Conventions',
-        //   url: '#',
-        // },
-        // {
-        //   title: 'Functions',
-        //   url: '#',
-        // },
-        // {
-        //   title: 'next.config.js Options',
-        //   url: '#',
-        // },
-        // {
-        //   title: 'CLI',
-        //   url: '#',
-        // },
-        // {
-        //   title: 'Edge Runtime',
-        //   url: '#',
-        // },
-      ],
-    },
-    {
-      title: 'Account',
-      url: '#',
-      items: [
-        {
-          title: 'Settings',
-          url: '#',
-        },  
-        {
-          title: 'Logout',
-          url: '/logout',
-        },
-      ],
-    },
-  ],
+// Data kelurahan - bisa disesuaikan
+const kelurahanData = {
+name: "Kelurahan Sumber Jaya", // Ganti dengan nama kelurahan Anda
+district: "Kecamatan Kemiling", // Ganti dengan kecamatan Anda
+city: "Bandar Lampung" // Ganti dengan kota Anda
 }
+
+// Menu items utama
+const mainMenuItems = [
+{
+  title: "Dashboard",
+  url: "/dashboard",
+  icon: Home,
+  description: "Halaman utama sistem"
+},
+{
+  title: "Input Data Warga",
+  url: "/inputData",
+  icon: Users,
+  description: "Form input data warga"
+},
+{
+  title: "Output Data",
+  url: "/outputData",
+  icon: FileText,
+  description: "Lihat dan kelola data warga"
+},
+]
+
+// Menu API Reference
+const apiItems = [
+{
+  title: "Components",
+  url: "#",
+  icon: BarChart3,
+  description: "Komponen sistem"
+},
+]
+
+// Menu Account
+const accountItems = [
+{
+  title: "Settings",
+  url: "#",
+  icon: Settings,
+  description: "Pengaturan sistem"
+},
+{
+  title: "Logout",
+  url: "/logout",
+  icon: LogOut,
+  description: "Keluar dari sistem"
+},
+]
 </script>
 
 <template>
-  <Sidebar v-bind="props">
-    <SidebarHeader>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as-child>
-            <a href="#">
+<!-- ✅ PERBAIKAN: Pastikan variant="inset" dan collapsible="none" -->
+<Sidebar variant="inset" collapsible="none">
+  <SidebarHeader>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
               <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <GalleryVerticalEnd class="size-4" />
+                <Building2 class="size-4" />
               </div>
-              <div class="flex flex-col gap-0.5 leading-none">
-                <span class="font-semibold">Decision Support System</span>
-                <span class="">DSS</span>
+              <div class="grid flex-1 text-left text-sm leading-tight">
+                <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
+                <span class="truncate text-xs">{{ kelurahanData.district }}</span>
               </div>
-            </a>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarHeader>
-    <SidebarContent>
-      <SidebarGroup>
+              <ChevronDown class="ml-auto size-4" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            class="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+            side="bottom"
+            align="start"
+            :sideOffset="4"
+          >
+            <DropdownMenuItem class="gap-2 p-2">
+              <div class="flex size-6 items-center justify-center rounded-sm border">
+                <Building2 class="size-4 shrink-0" />
+              </div>
+              <div class="grid flex-1 text-left text-sm leading-tight">
+                <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
+                <span class="truncate text-xs text-muted-foreground">{{ kelurahanData.district }}</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem class="gap-2 p-2">
+              <div class="flex size-6 items-center justify-center rounded-sm border">
+                <MapPin class="size-4 shrink-0" />
+              </div>
+              <div class="grid flex-1 text-left text-sm leading-tight">
+                <span class="truncate font-semibold">{{ kelurahanData.city }}</span>
+                <span class="truncate text-xs text-muted-foreground">Kota</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  </SidebarHeader>
+  
+  <SidebarContent>
+    <!-- Platform Section -->
+    <SidebarGroup>
+      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarMenuItem v-for="item in data.navMain" :key="item.title">
-            <SidebarMenuButton as-child>
-              <NuxtLink :to="item.url" class="font-medium">
-                {{ item.title }}
+          <SidebarMenuItem v-for="item in mainMenuItems" :key="item.title">
+            <SidebarMenuButton as-child :tooltip="item.description">
+              <NuxtLink :to="item.url" class="flex items-center gap-2">
+                <component :is="item.icon" class="size-4" />
+                <span>{{ item.title }}</span>
               </NuxtLink>
             </SidebarMenuButton>
-            <SidebarMenuSub v-if="item.items.length">
-              <SidebarMenuSubItem v-for="childItem in item.items" :key="childItem.title">
-                <SidebarMenuSubButton as-child >
-                  <NuxtLink :to="childItem.url">{{ childItem.title }}</NuxtLink>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
-            </SidebarMenuSub>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarGroup>
-    </SidebarContent>
-    <SidebarRail />
-  </Sidebar>
+      </SidebarGroupContent>
+    </SidebarGroup>
+
+    <!-- API Reference Section -->
+    <SidebarGroup>
+      <SidebarGroupLabel>API Reference</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem v-for="item in apiItems" :key="item.title">
+            <SidebarMenuButton as-child :tooltip="item.description">
+              <a :href="item.url" class="flex items-center gap-2">
+                <component :is="item.icon" class="size-4" />
+                <span>{{ item.title }}</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+
+    <!-- Account Section -->
+    <SidebarGroup>
+      <SidebarGroupLabel>Account</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem v-for="item in accountItems" :key="item.title">
+            <SidebarMenuButton as-child :tooltip="item.description">
+              <NuxtLink :to="item.url" class="flex items-center gap-2">
+                <component :is="item.icon" class="size-4" />
+                <span>{{ item.title }}</span>
+              </NuxtLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  </SidebarContent>
+</Sidebar>
 </template>

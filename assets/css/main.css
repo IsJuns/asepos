@@ -1,9 +1,7 @@
-/* ✅ PERBAIKAN: Gunakan sintaks Tailwind CSS v3 standar */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Variabel CSS untuk tema (sesuai dengan shadcn/ui dan sidebar Anda) */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -27,16 +25,14 @@
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
 
-    /* Chart colors (sesuaikan jika Anda memiliki warna chart spesifik) */
-    --chart-1: 220 100% 60%; /* Blue */
-    --chart-2: 140 100% 40%; /* Green */
-    --chart-3: 40 100% 60%; /* Orange */
-    --chart-4: 280 100% 60%; /* Purple */
-    --chart-5: 0 100% 60%; /* Red */
+    --chart-1: 220 100% 60%;
+    --chart-2: 140 100% 40%;
+    --chart-3: 40 100% 60%;
+    --chart-4: 280 100% 60%;
+    --chart-5: 0 100% 60%;
 
-    /* Sidebar colors (dari konfigurasi Anda sebelumnya) */
-    --sidebar-background: 0 0% 98%; /* Light mode background */
-    --sidebar-foreground: 240 5.3% 26.1%; /* Light mode text color */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
@@ -66,16 +62,14 @@
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
 
-    /* Chart colors (sesuaikan jika Anda memiliki warna chart spesifik) */
-    --chart-1: 220 100% 60%; /* Blue */
-    --chart-2: 140 100% 40%; /* Green */
-    --chart-3: 40 100% 60%; /* Orange */
-    --chart-4: 280 100% 60%; /* Purple */
-    --chart-5: 0 100% 60%; /* Red */
+    --chart-1: 220 100% 60%;
+    --chart-2: 140 100% 40%;
+    --chart-3: 40 100% 60%;
+    --chart-4: 280 100% 60%;
+    --chart-5: 0 100% 60%;
 
-    /* Sidebar colors (dari konfigurasi Anda sebelumnya) */
-    --sidebar-background: 240 5.9% 10%; /* Dark mode background */
-    --sidebar-foreground: 240 4.8% 95.9%; /* Dark mode text color */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 0 0% 98%;
     --sidebar-primary-foreground: 240 5.9% 10%;
     --sidebar-accent: 240 3.7% 15.9%;

@@ -6,16 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { useNuxtApp } from '#app'
+import { definePageMeta, useNuxtApp } from '#imports' // ✅ PERBAIKAN: Import definePageMeta dari #imports
+import type { Warga } from '@/types/warga' // ✅ Import tipe Warga
 
 const router = useRouter()
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
 
-const dataWarga = ref<any[]>([])
+const dataWarga = ref<Warga[]>([]) // ✅ Terapkan tipe Warga[]
 const isLoading = ref(false)
 const searchQuery = ref('')
-const sortBy = ref<'nama' | 'skor'>('skor')
+const sortBy = ref<'nama' | 'skor' | 'nik_kk'>('skor')
 
 const fetchData = async () => {
   isLoading.value = true
@@ -24,51 +25,99 @@ const fetchData = async () => {
   dataWarga.value = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
-  }))
+  } as Warga)) // ✅ Cast ke tipe Warga
   isLoading.value = false
 }
 
-// Dummy logika SMART (sementara)
+// ✅ PERBAIKAN: Logika SMART berbasis NIK KK
 const hitungSMART = async () => {
   isLoading.value = true
-  const penghasilanList = dataWarga.value.map(w => w.penghasilan)
-  const tanggunganList = dataWarga.value.map(w => w.jumlah_tanggungan)
-  const maxPenghasilan = penghasilanList.length > 0 ? Math.max(...penghasilanList) : 1
-  const minPenghasilan = penghasilanList.length > 0 ? Math.min(...penghasilanList) : 0
-  const maxTanggungan = tanggunganList.length > 0 ? Math.max(...tanggunganList) : 1
-  const minTanggungan = tanggunganList.length > 0 ? Math.min(...tanggunganList) : 0
+  try {
+    const { collection, getDocs, doc, updateDoc } = await import('firebase/firestore')
+    const snapshot = await getDocs(collection(db, 'data_warga'));
+    const dataWargaSaatIni: Warga[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warga)); // ✅ Terapkan tipe Warga
 
-  for (const w of dataWarga.value) {
-    const normPenghasilan = (maxPenghasilan - w.penghasilan) / (maxPenghasilan - minPenghasilan || 1)
-    const normTanggungan = (w.jumlah_tanggungan - minTanggungan) / (maxTanggungan - minTanggungan || 1)
-    const skorKondisi = getSkorKondisi(w.kondisi_tempat_tinggal)
-    const skorPekerjaan = getSkorPekerjaan(w.status_pekerjaan)
-    const normKondisi = (3 - skorKondisi) / 2
-    const normPekerjaan = (skorPekerjaan - 1) / 2
+    const dataKeluarga: Record<string, {
+      anggota: Warga[], // ✅ Terapkan tipe Warga
+      totalPenghasilan: number,
+      totalTanggungan: number,
+      kondisiTempatTinggal: string,
+      statusPekerjaan: string,
+      rt: number,
+      rw: number
+    }> = {};
 
-    const skor = parseFloat((
-      normPenghasilan * 0.4 +
-      normTanggungan * 0.2 +
-      normKondisi * 0.2 +
-      normPekerjaan * 0.2
-    ).toFixed(3))
+    dataWargaSaatIni.forEach(w => {
+      const nikKk = w.nik_kk;
+      if (!nikKk) return;
 
-    const { doc, updateDoc } = await import('firebase/firestore')
-    const wargaRef = doc(db, 'data_warga', w.id)
-    await updateDoc(wargaRef, { skorKelayakan: skor })
-    w.skorKelayakan = skor
+      if (!dataKeluarga[nikKk]) {
+        dataKeluarga[nikKk] = {
+          anggota: [],
+          totalPenghasilan: 0,
+          totalTanggungan: 0,
+          kondisiTempatTinggal: w.kondisi_tempat_tinggal,
+          statusPekerjaan: w.status_pekerjaan,
+          rt: w.rt,
+          rw: w.rw
+        };
+      }
+      dataKeluarga[nikKk].anggota.push(w);
+      dataKeluarga[nikKk].totalPenghasilan += w.penghasilan || 0;
+      dataKeluarga[nikKk].totalTanggungan += w.jumlah_tanggungan || 0;
+    });
+
+    const allPenghasilanKeluarga = Object.values(dataKeluarga).map(k => k.totalPenghasilan);
+    const allTanggunganKeluarga = Object.values(dataKeluarga).map(k => k.totalTanggungan);
+
+    const maxPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.max(...allPenghasilanKeluarga) : 1;
+    const minPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.min(...allPenghasilanKeluarga) : 0;
+    const maxTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.max(...allTanggunganKeluarga) : 1;
+    const minTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.min(...allTanggunganKeluarga) : 0;
+
+    for (const nikKk in dataKeluarga) {
+      const keluarga = dataKeluarga[nikKk];
+
+      const normPenghasilan = (maxPenghasilanKeluarga - keluarga.totalPenghasilan) / (maxPenghasilanKeluarga - minPenghasilanKeluarga || 1);
+      const normTanggungan = (keluarga.totalTanggungan - minTanggunganKeluarga) / (maxTanggunganKeluarga - minTanggunganKeluarga || 1);
+      const skorKondisi = getSkorKondisi(keluarga.kondisiTempatTinggal);
+      const skorPekerjaan = getSkorPekerjaan(keluarga.statusPekerjaan);
+      const normKondisi = (3 - skorKondisi) / 2;
+      const normPekerjaan = (skorPekerjaan - 1) / 2;
+
+      const skorKelayakanKeluarga = parseFloat((
+        normPenghasilan * 0.4 +
+        normTanggungan * 0.2 +
+        normKondisi * 0.2 +
+        normPekerjaan * 0.2
+      ).toFixed(3));
+
+      // Update skorKelayakan untuk setiap anggota keluarga
+      for (const anggota of keluarga.anggota) {
+        const wargaRef = doc(db, 'data_warga', anggota.id);
+        await updateDoc(wargaRef, { skorKelayakan: skorKelayakanKeluarga });
+      }
+    }
+    alert('✅ Perhitungan SMART berhasil & skor tersimpan!');
+    await fetchData(); // Refresh data setelah perhitungan
+  } catch (error) {
+    console.error('Gagal menghitung SMART:', error);
+    alert('❌ Gagal menghitung SMART: ' + error);
+  } finally {
+    isLoading.value = false;
   }
-  isLoading.value = false
-  alert('✅ Perhitungan SMART berhasil & skor tersimpan!')
 }
 
 // computed untuk pencarian + sorting
 const filteredWarga = computed(() => {
   const filtered = dataWarga.value.filter(w =>
-    w.nama.toLowerCase().includes(searchQuery.value.toLowerCase())
+    w.nama.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    (w.nik_kk && w.nik_kk.toLowerCase().includes(searchQuery.value.toLowerCase()))
   )
   if (sortBy.value === 'skor') {
     return [...filtered].sort((a, b) => (b.skorKelayakan || 0) - (a.skorKelayakan || 0))
+  } else if (sortBy.value === 'nik_kk') {
+    return [...filtered].sort((a, b) => (a.nik_kk || '').localeCompare(b.nik_kk || ''))
   } else {
     return [...filtered].sort((a, b) => a.nama.localeCompare(b.nama))
   }
@@ -113,9 +162,10 @@ const exportToExcel = async () => {
   if (process.client) {
     const fileSaver = await import('file-saver')
     const saveAs = fileSaver.saveAs
-    const wsData = dataWarga.value.map((w: any) => ({
+    const wsData = dataWarga.value.map((w: Warga) => ({ // ✅ Terapkan tipe Warga
       Nama: w.nama,
-      NIK: w.nik,
+      'NIK KTP': w.nik,
+      'NIK KK': w.nik_kk,
       Penghasilan: w.penghasilan,
       Tanggungan: w.jumlah_tanggungan,
       'Kondisi Tempat Tinggal': w.kondisi_tempat_tinggal,
@@ -141,10 +191,11 @@ const exportToPDF = async () => {
     const doc = new jsPDF()
     doc.text('Data Warga & Skor Kelayakan', 14, 15)
     autoTable(doc, {
-      head: [['Nama', 'NIK', 'Penghasilan', 'Tanggungan', 'Kondisi', 'Pekerjaan', 'Skor']],
-      body: dataWarga.value.map((w: any) => [
+      head: [['Nama', 'NIK KTP', 'NIK KK', 'Penghasilan', 'Tanggungan', 'Kondisi', 'Pekerjaan', 'Skor']],
+      body: dataWarga.value.map((w: Warga) => [ // ✅ Terapkan tipe Warga
         w.nama,
         w.nik,
+        w.nik_kk,
         `Rp${w.penghasilan.toLocaleString()}`,
         w.jumlah_tanggungan,
         w.kondisi_tempat_tinggal,
@@ -173,20 +224,21 @@ let saveAs: any
 
 // Modal state
 const showEditModal = ref(false)
-const selectedWarga = reactive<any>({
+const selectedWarga = reactive<Warga>({ // ✅ Terapkan tipe Warga
   id: '',
   nama: '',
   nik: '',
+  nik_kk: '',
   penghasilan: 0,
   jumlah_tanggungan: 0,
   kondisi_tempat_tinggal: '',
   status_pekerjaan: '',
-  rt: '',
-  rw: ''
+  rt: 0, // Default ke 0 atau sesuaikan
+  rw: 0  // Default ke 0 atau sesuaikan
 })
 
 // Buka modal dengan data
-const editWarga = (warga: any) => {
+const editWarga = (warga: Warga) => { // ✅ Terapkan tipe Warga
   Object.assign(selectedWarga, warga)
   showEditModal.value = true
 }
@@ -200,6 +252,7 @@ const simpanPerubahan = async () => {
     await updateDoc(wargaRef, {
       nama: selectedWarga.nama,
       nik: selectedWarga.nik,
+      nik_kk: selectedWarga.nik_kk,
       penghasilan: selectedWarga.penghasilan,
       jumlah_tanggungan: selectedWarga.jumlah_tanggungan,
       kondisi_tempat_tinggal: selectedWarga.kondisi_tempat_tinggal,
@@ -216,7 +269,7 @@ const simpanPerubahan = async () => {
 }
 
 // Fungsi untuk menghapus data warga
-const deleteWarga = async (warga: any) => {
+const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
   if (confirm(`Apakah Anda yakin ingin menghapus data ${warga.nama} (NIK: ${warga.nik})?`)) {
     try {
       const { doc, deleteDoc } = await import('firebase/firestore')
@@ -244,11 +297,12 @@ const deleteWarga = async (warga: any) => {
         <!-- Search and Action Buttons -->
         <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
           <div class="flex gap-2 items-center w-full md:w-[250px]">
-            <Input v-model="searchQuery" placeholder="Cari nama..." class="w-full md:w-[250px]" />
+            <Input v-model="searchQuery" placeholder="Cari nama atau NIK KK..." class="w-full md:w-[250px]" />
           </div>
           <div class="flex flex-wrap gap-2">
             <Button @click="sortBy = 'skor'" :variant="sortBy === 'skor' ? 'default' : 'outline'">Urutkan Skor</Button>
             <Button @click="sortBy = 'nama'" :variant="sortBy === 'nama' ? 'default' : 'outline'">Urutkan Nama</Button>
+            <Button @click="sortBy = 'nik_kk'" :variant="sortBy === 'nik_kk' ? 'default' : 'outline'">Urutkan NIK KK</Button>
             <Button @click="hitungSMART" :disabled="isLoading">
               {{ isLoading ? 'Memuat...' : 'Hitung SMART' }}
             </Button>
@@ -263,7 +317,8 @@ const deleteWarga = async (warga: any) => {
             <TableHeader class="bg-gray-50">
               <TableRow>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK</TableHead>
+                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK KTP</TableHead>
+                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK KK</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Penghasilan</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggungan</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RT</TableHead>
@@ -278,6 +333,7 @@ const deleteWarga = async (warga: any) => {
               <TableRow v-for="warga in filteredWarga" :key="warga.id">
                 <TableCell class="px-3 py-2 text-sm font-medium text-gray-900">{{ warga.nama }}</TableCell>
                 <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.nik }}</TableCell>
+                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.nik_kk }}</TableCell>
                 <TableCell class="px-3 py-2 text-sm text-gray-500">{{ formatCurrency(warga.penghasilan) }}</TableCell>
                 <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.jumlah_tanggungan }}</TableCell>
                 <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.rt }}</TableCell>
@@ -315,8 +371,12 @@ const deleteWarga = async (warga: any) => {
             <Input v-model="selectedWarga.nama" />
           </div>
           <div>
-            <label class="block text-sm font-medium">NIK</label>
+            <label class="block text-sm font-medium">NIK KTP</label>
             <Input v-model="selectedWarga.nik" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">NIK Kartu Keluarga (KK)</label>
+            <Input v-model="selectedWarga.nik_kk" />
           </div>
           <div>
             <label class="block text-sm font-medium">Penghasilan</label>
@@ -328,11 +388,11 @@ const deleteWarga = async (warga: any) => {
           </div>
           <div>
             <label class="block text-sm font-medium">RT</label>
-            <Input v-model="selectedWarga.rt" />
+            <Input v-model.number="selectedWarga.rt" type="number" />
           </div>
           <div>
             <label class="block text-sm font-medium">RW</label>
-            <Input v-model="selectedWarga.rw" />
+            <Input v-model.number="selectedWarga.rw" type="number" />
           </div>
           <div>
             <label class="block text-sm font-medium">Kondisi Tempat Tinggal</label>

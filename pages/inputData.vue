@@ -7,19 +7,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNuxtApp } from '#app'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-// Dapatkan instance Firebase yang disediakan oleh plugin
-const { $firebase } = useNuxtApp()
-const db = $firebase.db
-
 // Meta
 definePageMeta({
   title: 'Input Data Warga',
   middleware: ['auth'], // Tambahkan middleware auth
 })
 
+// Dapatkan instance Firebase yang disediakan oleh plugin
+const { $firebase } = useNuxtApp()
+const db = $firebase.db
+
 // 💡 State form
 const nama = ref('')
-const nik = ref('')
+const nik = ref('') // Ini akan menjadi NIK KTP
+const nikKk = ref('') // ✅ BARU: NIK Kartu Keluarga
 const penghasilan = ref('')
 const jumlahTanggungan = ref('')
 const kondisiTempatTinggal = ref('')
@@ -33,6 +34,7 @@ const submitForm = async () => {
   if (
     !nama.value ||
     !nik.value ||
+    !nikKk.value || // ✅ Validasi NIK KK
     penghasilan.value === '' || isNaN(parseFloat(penghasilan.value)) ||
     jumlahTanggungan.value === '' || isNaN(parseInt(jumlahTanggungan.value)) ||
     !kondisiTempatTinggal.value ||
@@ -49,7 +51,8 @@ const submitForm = async () => {
     // Gunakan fungsi Firestore dari instance db yang sudah diinisialisasi
     await addDoc(collection(db, 'data_warga'), {
       nama: nama.value,
-      nik: nik.value,
+      nik: nik.value, // NIK KTP
+      nik_kk: nikKk.value, // ✅ NIK Kartu Keluarga
       penghasilan: parseFloat(penghasilan.value),
       jumlah_tanggungan: parseInt(jumlahTanggungan.value),
       kondisi_tempat_tinggal: kondisiTempatTinggal.value,
@@ -62,6 +65,7 @@ const submitForm = async () => {
     // 🔄 Reset form
     nama.value = ''
     nik.value = ''
+    nikKk.value = '' // ✅ Reset NIK KK
     penghasilan.value = ''
     jumlahTanggungan.value = ''
     kondisiTempatTinggal.value = ''
@@ -90,10 +94,15 @@ const submitForm = async () => {
           <Label>Nama</Label>
           <Input v-model="nama" placeholder="Masukkan nama" />
         </div>
-        <!-- 🔷 NIK -->
+        <!-- 🔷 NIK KTP -->
         <div class="space-y-2">
-          <Label>NIK</Label>
-          <Input v-model="nik" placeholder="Masukkan NIK" />
+          <Label>NIK KTP</Label>
+          <Input v-model="nik" placeholder="Masukkan NIK KTP" />
+        </div>
+        <!-- ✅ BARU: NIK KK -->
+        <div class="space-y-2">
+          <Label>NIK Kartu Keluarga (KK)</Label>
+          <Input v-model="nikKk" placeholder="Masukkan NIK Kartu Keluarga" />
         </div>
         <!-- 🔷 Penghasilan -->
         <div class="space-y-2">
