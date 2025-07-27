@@ -9,16 +9,14 @@ interface FirebaseComposable {
 
 export const useFirebase = (): FirebaseComposable => {
   const nuxtApp = useNuxtApp()
-
-  // Memastikan instance sudah tersedia dari plugin
-  if (!nuxtApp.$auth || !nuxtApp.$db) {
+  // ✅ PERBAIKAN: Akses properti auth dan db dari objek $firebase
+  if (!nuxtApp.$firebase || !nuxtApp.$firebase.auth || !nuxtApp.$firebase.db) {
     throw new Error(
       "Firebase instances not provided by plugin. Ensure plugins/firebase.client.ts is correctly configured and running.",
     )
   }
-
   return {
-    auth: nuxtApp.$auth as Auth,
-    db: nuxtApp.$db as Firestore,
+    auth: nuxtApp.$firebase.auth as Auth,
+    db: nuxtApp.$firebase.db as Firestore,
   }
 }
