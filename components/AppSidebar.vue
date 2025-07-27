@@ -6,7 +6,7 @@ FileText,
 BarChart3, 
 Settings, 
 LogOut, 
-Building2,
+Building2, // Tetap impor jika masih digunakan di tempat lain, atau hapus jika tidak
 ChevronDown,
 MapPin
 } from "lucide-vue-next"
@@ -28,11 +28,11 @@ DropdownMenuItem,
 DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// Data kelurahan - bisa disesuaikan
+// ✅ PERBAIKAN: Data kelurahan disesuaikan dengan Babakan Asih
 const kelurahanData = {
-name: "Kelurahan Sumber Jaya", // Ganti dengan nama kelurahan Anda
-district: "Kecamatan Kemiling", // Ganti dengan kecamatan Anda
-city: "Bandar Lampung" // Ganti dengan kota Anda
+  name: "Kelurahan Babakan Asih",
+  district: "Kecamatan Bojongloa Kaler", // Contoh kecamatan untuk Babakan Asih
+  city: "Bandung" // Contoh kota untuk Babakan Asih
 }
 
 // Menu items utama
@@ -85,7 +85,6 @@ const accountItems = [
 </script>
 
 <template>
-<!-- ✅ PERBAIKAN: Pastikan variant="inset" dan collapsible="none" -->
 <Sidebar variant="inset" collapsible="none">
   <SidebarHeader>
     <SidebarMenu>
@@ -96,9 +95,8 @@ const accountItems = [
               size="lg"
               class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Building2 class="size-4" />
-              </div>
+              <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar -->
+              <img src="/assets/image/basih.png" alt="Kelurahan Babakan Asih Logo" class="size-8 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs">{{ kelurahanData.district }}</span>
@@ -113,9 +111,8 @@ const accountItems = [
             :sideOffset="4"
           >
             <DropdownMenuItem class="gap-2 p-2">
-              <div class="flex size-6 items-center justify-center rounded-sm border">
-                <Building2 class="size-4 shrink-0" />
-              </div>
+              <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar di dropdown -->
+              <img src="/assets/image/basih.png" alt="Kelurahan Babakan Asih Logo" class="size-6 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs text-muted-foreground">{{ kelurahanData.district }}</span>
@@ -135,7 +132,7 @@ const accountItems = [
       </SidebarMenuItem>
     </SidebarMenu>
   </SidebarHeader>
-  
+
   <SidebarContent>
     <!-- Platform Section -->
     <SidebarGroup>
