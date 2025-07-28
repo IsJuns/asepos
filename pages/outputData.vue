@@ -8,28 +8,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input'
 import { definePageMeta, useNuxtApp } from '#imports'
 import type { Warga } from '@/types/warga'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog' // Import Dialog components
 
 const router = useRouter()
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
 
-const dataWarga = ref<Warga[]>([])
+const allWarga = ref<Warga[]>([]) // Mengubah nama dari dataWarga menjadi allWarga untuk konsistensi
 const isLoading = ref(false)
 const searchQuery = ref('')
-const sortBy = ref<'nama' | 'skor' | 'nik_kk'>('skor')
+const sortBy = ref<'skor' | 'namaKepalaKeluarga' | 'nik_kk'>('skor') // Mengubah opsi sort
+const showLayakOnly = ref(false) // Filter baru
+
+// State untuk modal detail keluarga
+const showDetailModal = ref(false)
+const selectedFamilyMembers = ref<Warga[]>([])
+const selectedFamilyHeadName = ref('')
+const selectedFamilyNikKk = ref('')
 
 const fetchData = async () => {
   isLoading.value = true
   const { collection, getDocs } = await import('firebase/firestore')
   const querySnapshot = await getDocs(collection(db, 'data_warga'))
-  dataWarga.value = querySnapshot.docs.map(doc => ({
+  allWarga.value = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   } as Warga))
   isLoading.value = false
 }
 
-// --- Fungsi Konversi Skor Baru (sesuai kriteria Anda) ---
+// --- Fungsi Konversi Skor (sesuai kriteria Anda) ---
 const getSkorPenghasilan = (penghasilan: number): number => {
   if (penghasilan <= 1000000) return 1.0;
   if (penghasilan <= 2000000) return 0.8;
@@ -51,7 +59,7 @@ const getSkorKondisiRumah = (kondisi?: string): number => {
     case 'sewa': return 0.8;
     case 'rumah sendiri sederhana': return 0.6;
     case 'rumah permanen bagus': return 0.3;
-    default: return 0.0; // Jika tidak ada data atau tidak cocok
+    default: return 0.0;
   }
 }
 
@@ -63,10 +71,10 @@ const getSkorPekerjaan = (status?: string): number => {
     case 'pekerja swasta': return 0.5;
     case 'pns':
     case 'pegawai tetap': return 0.3;
-    default: return 0.0; // Jika tidak ada data atau tidak cocok
+    default: return 0.0;
   }
 }
-// --- Akhir Fungsi Konversi Skor Baru ---
+// --- Akhir Fungsi Konversi Skor ---
 
 const hitungSMART = async () => {
   isLoading.value = true
@@ -104,7 +112,6 @@ const hitungSMART = async () => {
       dataKeluarga[nikKk].totalTanggungan += w.jumlah_tanggungan || 0;
     });
 
-    // Bobot Kriteria Baru
     const W_PENGHASILAN = 0.4;
     const W_TANGGUNGAN = 0.2;
     const W_KONDISI = 0.2;
@@ -153,19 +160,76 @@ const hitungSMART = async () => {
   }
 }
 
-const filteredWarga = computed(() => {
-  const filtered = dataWarga.value.filter(w =>
-    w.nama.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    (w.nik_kk && w.nik_kk.toLowerCase().includes(searchQuery.value.toLowerCase()))
-  )
-  if (sortBy.value === 'skor') {
-    return [...filtered].sort((a, b) => (b.skorKelayakan || 0) - (a.skorKelayakan || 0))
-  } else if (sortBy.value === 'nik_kk') {
-    return [...filtered].sort((a, b) => (a.nik_kk || '').localeCompare(b.nik_kk || ''))
-  } else {
-    return [...filtered].sort((a, b) => a.nama.localeCompare(b.nama))
+// Struktur data untuk keluarga
+interface FamilyData {
+  nik_kk: string;
+  namaKepalaKeluarga: string;
+  skorKelayakan: number;
+  statusKelayakan: string;
+  rt: number;
+  rw: number;
+  anggota: Warga[];
+}
+
+const groupedFamilies = computed<FamilyData[]>(() => {
+  const families: Record<string, FamilyData> = {};
+
+  allWarga.value.forEach(warga => {
+    if (!warga.nik_kk) return;
+
+    if (!families[warga.nik_kk]) {
+      families[warga.nik_kk] = {
+        nik_kk: warga.nik_kk,
+        namaKepalaKeluarga: warga.nama, // Ambil nama anggota pertama sebagai kepala keluarga
+        skorKelayakan: warga.skorKelayakan || 0, // Ambil skor dari anggota ini (seharusnya sama untuk semua anggota keluarga)
+        statusKelayakan: getStatusKelayakan(warga.skorKelayakan || 0),
+        rt: warga.rt,
+        rw: warga.rw,
+        anggota: []
+      };
+    }
+    families[warga.nik_kk].anggota.push(warga);
+  });
+
+  // Konversi objek ke array dan urutkan
+  const sortedFamilies = Object.values(families).sort((a, b) => {
+    if (sortBy.value === 'skor') {
+      return b.skorKelayakan - a.skorKelayakan;
+    } else if (sortBy.value === 'nik_kk') {
+      return a.nik_kk.localeCompare(b.nik_kk);
+    } else { // 'namaKepalaKeluarga'
+      return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
+    }
+  });
+
+  return sortedFamilies;
+});
+
+const filteredFamilies = computed(() => {
+  let filtered = groupedFamilies.value.filter(family =>
+    family.namaKepalaKeluarga.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    family.nik_kk.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+
+  if (showLayakOnly.value) {
+    filtered = filtered.filter(family => family.statusKelayakan === 'Layak');
   }
-})
+
+  return filtered;
+});
+
+const getStatusKelayakan = (score: number): string => {
+  if (score >= 0.8) return 'Layak';
+  if (score >= 0.4) return 'Pertimbangan';
+  return 'Tidak Layak';
+}
+
+const getScoreClass = (score?: number) => {
+  if (score === undefined) return 'bg-gray-100 text-gray-800';
+  if (score >= 0.8) return 'bg-green-100 text-green-800';
+  if (score >= 0.4) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -176,33 +240,26 @@ const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-const getScoreClass = (score?: number) => {
-  if (score === undefined) return 'bg-gray-100 text-gray-800';
-  if (score >= 0.7) return 'bg-green-100 text-green-800';
-  if (score >= 0.4) return 'bg-yellow-100 text-yellow-800';
-  return 'bg-red-100 text-red-800';
-}
-
 const exportToExcel = async () => {
   if (process.client) {
     const fileSaver = await import('file-saver')
     const saveAs = fileSaver.saveAs
-    const wsData = dataWarga.value.map((w: Warga) => ({
-      Nama: w.nama,
-      'NIK KTP': w.nik,
-      'NIK KK': w.nik_kk,
-      Penghasilan: w.penghasilan,
-      Tanggungan: w.jumlah_tanggungan,
-      'Kondisi Tempat Tinggal': w.kondisi_tempat_tinggal,
-      'Status Pekerjaan': w.status_pekerjaan,
-      'Skor Kelayakan': w.skorKelayakan ?? '-',
+    const wsData = filteredFamilies.value.map((family: FamilyData) => ({
+      'Nama Kepala Keluarga': family.namaKepalaKeluarga,
+      'NIK KK': family.nik_kk,
+      RT: family.rt,
+      RW: family.rw,
+      'Skor Kelayakan': family.skorKelayakan,
+      'Status Kelayakan': family.statusKelayakan,
+      'Jumlah Anggota': family.anggota.length,
+      // Anda bisa menambahkan detail anggota di sini jika diperlukan, tapi akan membuat Excel sangat lebar
     }))
     const worksheet = XLSX.utils.json_to_sheet(wsData)
     const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Warga')
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Keluarga')
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' })
-    saveAs(blob, 'data-warga.xlsx')
+    saveAs(blob, 'data-keluarga.xlsx')
   }
 }
 
@@ -213,77 +270,46 @@ const exportToPDF = async () => {
     const autoTableModule = await import('jspdf-autotable')
     const autoTable = autoTableModule.default
     const doc = new jsPDF()
-    doc.text('Data Warga & Skor Kelayakan', 14, 15)
+    doc.text('Data Keluarga & Skor Kelayakan', 14, 15)
     autoTable(doc, {
-      head: [['Nama', 'NIK KTP', 'NIK KK', 'Penghasilan', 'Tanggungan', 'Kondisi', 'Pekerjaan', 'Skor']],
-      body: dataWarga.value.map((w: Warga) => [
-        w.nama,
-        w.nik,
-        w.nik_kk,
-        `Rp${w.penghasilan.toLocaleString()}`,
-        w.jumlah_tanggungan,
-        w.kondisi_tempat_tinggal,
-        w.status_pekerjaan,
-        w.skorKelayakan ?? '-'
+      head: [['Nama Kepala Keluarga', 'NIK KK', 'RT', 'RW', 'Skor', 'Status', 'Anggota']],
+      body: filteredFamilies.value.map((family: FamilyData) => [
+        family.namaKepalaKeluarga,
+        family.nik_kk,
+        family.rt,
+        family.rw,
+        family.skorKelayakan.toFixed(3),
+        family.statusKelayakan,
+        family.anggota.length
       ]),
       startY: 20,
     })
-    doc.save('data-warga.pdf')
+    doc.save('data-keluarga.pdf')
   }
 }
 
-const showEditModal = ref(false)
-const selectedWarga = reactive<Warga>({
-  id: '',
-  nama: '',
-  nik: '',
-  nik_kk: '',
-  penghasilan: 0,
-  jumlah_tanggungan: 0,
-  kondisi_tempat_tinggal: '',
-  status_pekerjaan: '',
-  rt: 0,
-  rw: 0
-})
-
-const editWarga = (warga: Warga) => {
-  Object.assign(selectedWarga, warga)
-  showEditModal.value = true
+const openDetailModal = (family: FamilyData) => {
+  selectedFamilyMembers.value = family.anggota;
+  selectedFamilyHeadName.value = family.namaKepalaKeluarga;
+  selectedFamilyNikKk.value = family.nik_kk;
+  showDetailModal.value = true;
 }
 
-const simpanPerubahan = async () => {
-  if (!selectedWarga.id) return
-  try {
-    const { doc, updateDoc } = await import('firebase/firestore')
-    const wargaRef = doc(db, 'data_warga', selectedWarga.id)
-    await updateDoc(wargaRef, {
-      nama: selectedWarga.nama,
-      nik: selectedWarga.nik,
-      nik_kk: selectedWarga.nik_kk,
-      penghasilan: selectedWarga.penghasilan,
-      jumlah_tanggungan: selectedWarga.jumlah_tanggungan,
-      kondisi_tempat_tinggal: selectedWarga.kondisi_tempat_tinggal,
-      status_pekerjaan: selectedWarga.status_pekerjaan,
-      rt: selectedWarga.rt,
-      rw: selectedWarga.rw
-    })
-    showEditModal.value = false
-    await fetchData()
-    alert('✅ Data berhasil diperbarui!')
-  } catch (error) {
-    alert('❌ Gagal memperbarui data: ' + error)
-  }
-}
-
-const deleteWarga = async (warga: Warga) => {
-  if (confirm(`Apakah Anda yakin ingin menghapus data ${warga.nama} (NIK: ${warga.nik})?`)) {
+const deleteFamily = async (nikKk: string) => {
+  if (confirm(`Apakah Anda yakin ingin menghapus semua data untuk keluarga dengan NIK KK: ${nikKk}?`)) {
     try {
-      const { doc, deleteDoc } = await import('firebase/firestore')
-      await deleteDoc(doc(db, 'data_warga', warga.id))
-      await fetchData()
-      alert('✅ Data berhasil dihapus!')
+      const { collection, query, where, getDocs, deleteDoc } = await import('firebase/firestore')
+      const q = query(collection(db, 'data_warga'), where('nik_kk', '==', nikKk));
+      const querySnapshot = await getDocs(q);
+
+      const deletePromises = querySnapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+
+      await fetchData(); // Refresh data setelah penghapusan
+      alert('✅ Data keluarga berhasil dihapus!');
     } catch (error) {
-      alert('❌ Gagal menghapus data: ' + error)
+      console.error('Gagal menghapus data keluarga:', error);
+      alert('❌ Gagal menghapus data keluarga: ' + error);
     }
   }
 }
@@ -306,18 +332,21 @@ definePageMeta({
 
     <Card>
       <CardHeader>
-        <CardTitle>Data Warga & Skor Kelayakan</CardTitle>
+        <CardTitle>Data Keluarga & Skor Kelayakan</CardTitle>
       </CardHeader>
       <CardContent>
         <!-- Search and Action Buttons -->
         <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
           <div class="flex gap-2 items-center w-full md:w-[250px]">
-            <Input v-model="searchQuery" placeholder="Cari nama atau NIK KK..." class="w-full md:w-[250px]" />
+            <Input v-model="searchQuery" placeholder="Cari nama KK atau NIK KK..." class="w-full md:w-[250px]" />
           </div>
           <div class="flex flex-wrap gap-2">
             <Button @click="sortBy = 'skor'" :variant="sortBy === 'skor' ? 'default' : 'outline'">Urutkan Skor</Button>
-            <Button @click="sortBy = 'nama'" :variant="sortBy === 'nama' ? 'default' : 'outline'">Urutkan Nama</Button>
+            <Button @click="sortBy = 'namaKepalaKeluarga'" :variant="sortBy === 'namaKepalaKeluarga' ? 'default' : 'outline'">Urutkan Nama KK</Button>
             <Button @click="sortBy = 'nik_kk'" :variant="sortBy === 'nik_kk' ? 'default' : 'outline'">Urutkan NIK KK</Button>
+            <Button @click="showLayakOnly = !showLayakOnly" :variant="showLayakOnly ? 'default' : 'outline'">
+              {{ showLayakOnly ? 'Tampilkan Semua' : 'Filter Layak' }}
+            </Button>
             <Button @click="hitungSMART" :disabled="isLoading">
               {{ isLoading ? 'Memuat...' : 'Hitung SMART' }}
             </Button>
@@ -331,43 +360,47 @@ definePageMeta({
           <Table class="min-w-full divide-y divide-gray-200">
             <TableHeader class="bg-gray-50 sticky top-0 z-10">
               <TableRow>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK KTP</TableHead>
+                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Kepala Keluarga</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK KK</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Penghasilan</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggungan</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RT</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RW</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kondisi</TableHead>
-                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pekerjaan</TableHead>
+                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah Anggota</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skor Kelayakan</TableHead>
+                <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody class="bg-white divide-y divide-gray-200">
-              <TableRow v-for="warga in filteredWarga" :key="warga.id">
-                <TableCell class="px-3 py-2 text-sm font-medium text-gray-900">{{ warga.nama }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.nik }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.nik_kk }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ formatCurrency(warga.penghasilan) }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.jumlah_tanggungan }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.rt }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.rw }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.kondisi_tempat_tinggal }}</TableCell>
-                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ warga.status_pekerjaan }}</TableCell>
+              <TableRow v-if="filteredFamilies.length === 0">
+                <TableCell colspan="8" class="text-center text-muted-foreground py-4">
+                  Tidak ada data keluarga yang ditemukan.
+                </TableCell>
+              </TableRow>
+              <TableRow v-for="family in filteredFamilies" :key="family.nik_kk">
+                <TableCell class="px-3 py-2 text-sm font-medium text-gray-900">{{ family.namaKepalaKeluarga }}</TableCell>
+                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ family.nik_kk }}</TableCell>
+                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ family.rt }}</TableCell>
+                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ family.rw }}</TableCell>
+                <TableCell class="px-3 py-2 text-sm text-gray-500">{{ family.anggota.length }}</TableCell>
                 <TableCell class="px-3 py-2 text-sm text-center">
                   <span
-                    v-if="warga.skorKelayakan !== undefined"
-                    :class="getScoreClass(warga.skorKelayakan)"
+                    :class="getScoreClass(family.skorKelayakan)"
                     class="px-2 py-1 rounded-md text-xs font-medium"
                   >
-                    {{ warga.skorKelayakan.toFixed(3) }}
+                    {{ family.skorKelayakan.toFixed(3) }}
                   </span>
-                  <span v-else class="text-muted-foreground">-</span>
+                </TableCell>
+                <TableCell class="px-3 py-2 text-sm text-center">
+                  <span
+                    :class="getScoreClass(family.skorKelayakan)"
+                    class="px-2 py-1 rounded-md text-xs font-medium"
+                  >
+                    {{ family.statusKelayakan }}
+                  </span>
                 </TableCell>
                 <TableCell class="px-3 py-2 text-right text-sm font-medium whitespace-nowrap">
-                  <Button variant="ghost" size="sm" class="text-blue-600 hover:text-blue-900" @click="editWarga(warga)">Edit</Button>
-                  <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-900" @click="deleteWarga(warga)">Hapus</Button>
+                  <Button variant="ghost" size="sm" class="text-blue-600 hover:text-blue-900" @click="openDetailModal(family)">Detail</Button>
+                  <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-900" @click="deleteFamily(family.nik_kk)">Hapus Keluarga</Button>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -376,55 +409,43 @@ definePageMeta({
       </CardContent>
     </Card>
 
-    <!-- Edit Modal -->
-    <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div class="bg-white p-6 rounded-xl shadow-md w-full max-w-xl space-y-4">
-        <h2 class="text-lg font-semibold mb-4">Edit Data Warga</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium">Nama</label>
-            <Input v-model="selectedWarga.nama" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">NIK KTP</label>
-            <Input v-model="selectedWarga.nik" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">NIK Kartu Keluarga (KK)</label>
-            <Input v-model="selectedWarga.nik_kk" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Penghasilan</label>
-            <Input v-model.number="selectedWarga.penghasilan" type="number" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Tanggungan</label>
-            <Input v-model.number="selectedWarga.jumlah_tanggungan" type="number" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">RT</label>
-            <Input v-model.number="selectedWarga.rt" type="number" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">RW</label>
-            <Input v-model.number="selectedWarga.rw" type="number" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Kondisi Tempat Tinggal</label>
-            <Input v-model="selectedWarga.kondisi_tempat_tinggal" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Status Pekerjaan</label>
-            <Input v-model="selectedWarga.status_pekerjaan" />
-          </div>
+    <!-- Detail Keluarga Modal -->
+    <Dialog :open="showDetailModal" @update:open="showDetailModal = $event">
+      <DialogContent class="sm:max-w-[800px]">
+        <DialogHeader>
+          <DialogTitle>Detail Keluarga: {{ selectedFamilyHeadName }} (NIK KK: {{ selectedFamilyNikKk }})</DialogTitle>
+          <DialogDescription>
+            Daftar anggota keluarga dan detail masing-masing.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="overflow-x-auto max-h-[400px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama</TableHead>
+                <TableHead>NIK KTP</TableHead>
+                <TableHead>Penghasilan</TableHead>
+                <TableHead>Tanggungan</TableHead>
+                <TableHead>Kondisi Rumah</TableHead>
+                <TableHead>Pekerjaan</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="member in selectedFamilyMembers" :key="member.id">
+                <TableCell>{{ member.nama }}</TableCell>
+                <TableCell>{{ member.nik }}</TableCell>
+                <TableCell>{{ formatCurrency(member.penghasilan) }}</TableCell>
+                <TableCell>{{ member.jumlah_tanggungan }}</TableCell>
+                <TableCell>{{ member.kondisi_tempat_tinggal }}</TableCell>
+                <TableCell>{{ member.status_pekerjaan }}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
         <div class="flex justify-end gap-2 pt-4">
-          <Button variant="outline" size="sm" @click="showEditModal = false">
-            Batal
-          </Button>
-          <Button variant="default" @click="simpanPerubahan">Simpan</Button>
+          <Button variant="outline" @click="showDetailModal = false">Tutup</Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

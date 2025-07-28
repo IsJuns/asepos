@@ -1,23 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue' // Hapus watch
+import { ref, onMounted, computed } from 'vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { useRouter } from 'vue-router'
 import RTRWBreakdownChart from '@/components/RTRWBreakdownChart.vue'
 import PieChart from '~/components/PieChart.vue'
-import { definePageMeta } from '#imports' // Hapus useNuxtApp
+import { definePageMeta } from '#imports'
 import type { Warga } from '@/types/warga'
 import { Plus, Download, Upload, BarChart } from 'lucide-vue-next'
 import StatusPekerjaanChart from '~/components/StatusPekerjaanChart.vue'
 import KondisiTempatTinggalChart from '~/components/KondisiTempatTinggalChart.vue'
 import { useDashboardData } from '@/composables/useDashboardData'
-import { collection, addDoc } from 'firebase/firestore' // Import for handleFileImport
-import { useNuxtApp } from '#app' // Declare useNuxtApp
+import { collection, addDoc } from 'firebase/firestore'
+import { useNuxtApp } from '#app'
 
-const router = useRouter()
-const { $firebase } = useNuxtApp() // Get db instance here
+const { $firebase } = useNuxtApp()
 const db = $firebase.db
+const router = useRouter()
 
 const {
   totalWarga,
@@ -27,7 +27,7 @@ const {
   allWarga,
   isLoading,
   recentWarga,
-  fetchDashboardData // Fungsi fetch sekarang dari composable
+  fetchDashboardData
 } = useDashboardData()
 
 const importFileInput = ref<HTMLInputElement | null>(null)
@@ -63,21 +63,21 @@ const layakPercentage = computed(() => {
 const effectiveness = computed(() => {
   if (totalDataDonut.value === 0) return 'N/A'
   const score = ((layak.value * 1) + (pertimbangan.value * 0.5)) / totalDataDonut.value
-  if (score >= 0.8) return 'Tinggi'
+  if (score >= 0.8) return 'Tinggi' // Diperbarui: 0.8
   if (score >= 0.6) return 'Sedang'
   return 'Rendah'
 })
 
 const getScoreClass = (score?: number) => {
   if (score === undefined) return 'bg-gray-100 text-gray-800';
-  if (score >= 0.7) return 'bg-green-100 text-green-800';
+  if (score >= 0.8) return 'bg-green-100 text-green-800'; // Diperbarui: 0.8
   if (score >= 0.4) return 'bg-yellow-100 text-yellow-800';
   return 'bg-red-100 text-red-800';
 }
 
 const handleTambahData = () => {
   console.log('Tambah Data clicked!');
-  router.push('/inputData'); // Example: navigate to input data page
+  router.push('/inputData');
 }
 
 const handleEksporData = () => {
@@ -97,7 +97,7 @@ const handleEksporData = () => {
 
 const handleImporData = () => {
   console.log('Impor Data clicked!');
-  importFileInput.value?.click(); // Trigger the hidden file input
+  importFileInput.value?.click();
 }
 
 const handleFileImport = (event: Event) => {
@@ -115,7 +115,7 @@ const handleFileImport = (event: Event) => {
           await addDoc(collection(db, 'data_warga'), dataToSave);
         }
         alert('Data berhasil diimpor dan disimpan ke database!');
-        fetchDashboardData(); // Refresh dashboard data after import
+        fetchDashboardData();
       } catch (error) {
         console.error('Gagal memproses file impor:', error);
         alert('Gagal memproses file impor. Pastikan formatnya benar.');
@@ -127,7 +127,6 @@ const handleFileImport = (event: Event) => {
 
 const handleAnalisis = () => {
   console.log('Analisis clicked!');
-  // router.push('/analysis'); // Example: navigate to an analysis page
 }
 
 definePageMeta({
@@ -136,7 +135,7 @@ definePageMeta({
 })
 
 onMounted(() => {
-  fetchDashboardData() // Panggil fungsi fetch dari composable
+  fetchDashboardData()
 })
 </script>
 

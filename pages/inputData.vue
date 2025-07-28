@@ -6,21 +6,19 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNuxtApp } from '#app'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { definePageMeta } from '#imports'
 
-// Meta
 definePageMeta({
   title: 'Input Data Warga',
-  middleware: ['auth'], // Tambahkan middleware auth
+  middleware: ['auth'],
 })
 
-// Dapatkan instance Firebase yang disediakan oleh plugin
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
 
-// 💡 State form
 const nama = ref('')
-const nik = ref('') // Ini akan menjadi NIK KTP
-const nikKk = ref('') // ✅ BARU: NIK Kartu Keluarga
+const nik = ref('')
+const nikKk = ref('')
 const penghasilan = ref('')
 const jumlahTanggungan = ref('')
 const kondisiTempatTinggal = ref('')
@@ -28,13 +26,11 @@ const statusPekerjaan = ref('')
 const rt = ref('')
 const rw = ref('')
 
-// ✅ Validasi + Simpan ke Firestore
 const submitForm = async () => {
-  // 🔍 Validasi input kosong
   if (
     !nama.value ||
     !nik.value ||
-    !nikKk.value || // ✅ Validasi NIK KK
+    !nikKk.value ||
     penghasilan.value === '' || isNaN(parseFloat(penghasilan.value)) ||
     jumlahTanggungan.value === '' || isNaN(parseInt(jumlahTanggungan.value)) ||
     !kondisiTempatTinggal.value ||
@@ -45,14 +41,12 @@ const submitForm = async () => {
     return
   }
   try {
-    // 🔥 Impor dinamis Firestore functions
     const { collection, addDoc } = await import('firebase/firestore')
-    
-    // Gunakan fungsi Firestore dari instance db yang sudah diinisialisasi
+
     await addDoc(collection(db, 'data_warga'), {
       nama: nama.value,
-      nik: nik.value, // NIK KTP
-      nik_kk: nikKk.value, // ✅ NIK Kartu Keluarga
+      nik: nik.value,
+      nik_kk: nikKk.value,
       penghasilan: parseFloat(penghasilan.value),
       jumlah_tanggungan: parseInt(jumlahTanggungan.value),
       kondisi_tempat_tinggal: kondisiTempatTinggal.value,
@@ -62,10 +56,9 @@ const submitForm = async () => {
       timestamp: new Date()
     })
     alert('✅ Data berhasil disimpan!')
-    // 🔄 Reset form
     nama.value = ''
     nik.value = ''
-    nikKk.value = '' // ✅ Reset NIK KK
+    nikKk.value = ''
     penghasilan.value = ''
     jumlahTanggungan.value = ''
     kondisiTempatTinggal.value = ''
@@ -83,7 +76,7 @@ const submitForm = async () => {
     <div class="flex items-center justify-between">
       <h1 class="text-3xl font-bold tracking-tight">Input Data Warga</h1>
     </div>
-    
+
     <Card>
       <CardHeader>
         <CardTitle>Form Input Data Warga</CardTitle>
@@ -132,9 +125,11 @@ const submitForm = async () => {
               <SelectValue placeholder="Pilih kondisi" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Milik Sendiri">Milik Sendiri</SelectItem>
-              <SelectItem value="Kontrak">Kontrak</SelectItem>
+              <SelectItem value="Tidak Layak Huni">Tidak Layak Huni</SelectItem>
               <SelectItem value="Menumpang">Menumpang</SelectItem>
+              <SelectItem value="Sewa">Sewa</SelectItem>
+              <SelectItem value="Rumah Sendiri Sederhana">Rumah Sendiri Sederhana</SelectItem>
+              <SelectItem value="Rumah Permanen Bagus">Rumah Permanen Bagus</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -146,8 +141,12 @@ const submitForm = async () => {
               <SelectValue placeholder="Pilih status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Bekerja">Bekerja</SelectItem>
               <SelectItem value="Tidak Bekerja">Tidak Bekerja</SelectItem>
+              <SelectItem value="Buruh Harian">Buruh Harian</SelectItem>
+              <SelectItem value="Pedagang Kecil">Pedagang Kecil</SelectItem>
+              <SelectItem value="Pekerja Swasta">Pekerja Swasta</SelectItem>
+              <SelectItem value="PNS">PNS</SelectItem>
+              <SelectItem value="Pegawai Tetap">Pegawai Tetap</SelectItem>
               <SelectItem value="Pelajar/Mahasiswa">Pelajar/Mahasiswa</SelectItem>
             </SelectContent>
           </Select>
