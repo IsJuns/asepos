@@ -1,29 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Bar } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale
-} from 'chart.js'
-
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale
-)
+import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 const props = defineProps<{
   labels: string[]
   data: number[]
 }>()
+
+onMounted(() => {
+  console.log('BarChart received labels:', props.labels);
+  console.log('BarChart received data:', props.data);
+});
 
 const chartData = computed(() => ({
   labels: props.labels,
@@ -41,24 +30,33 @@ const chartData = computed(() => ({
 const options = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top' as const
-    },
-    title: {
-      display: true,
-      text: 'Skor Rata-Rata per RT/RW'
-    }
-  },
   scales: {
     y: {
       beginAtZero: true,
-      max: 1
+      max: 1,
+      title: {
+        display: true,
+        text: 'Rata-rata Skor Kelayakan'
+      }
+    },
+    x: {
+      title: {
+        display: true,
+        text: 'Kategori'
+      }
+    }
+  },
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top' as const
+    },
+    tooltip: {
+      enabled: true
     }
   }
 }
 </script>
-
 <template>
   <Bar :data="chartData" :options="options" />
 </template>

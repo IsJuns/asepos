@@ -1,37 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Line } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  LineElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  Filler // ✅ tambahkan plugin ini
-} from 'chart.js'
+import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler } from 'chart.js'
+ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler)
 
-// ✅ REGISTER semua plugin, termasuk Filler
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  LineElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  Filler // ✅ ini penting agar fill: true bekerja
-)
-
-// Props dari parent
 const props = defineProps<{
   labels: string[]
   data: number[]
 }>()
 
-// ✅ Reactive chart data
+onMounted(() => {
+  console.log('LineChart received labels:', props.labels);
+  console.log('LineChart received data:', props.data);
+});
+
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: [
@@ -40,7 +22,7 @@ const chartData = computed(() => ({
       data: props.data,
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.2)',
-      fill: true, // ✅ Aktifkan fill area di bawah garis
+      fill: true,
       tension: 0.4
     }
   ]
@@ -48,24 +30,34 @@ const chartData = computed(() => ({
 
 const options = {
   responsive: true,
-  plugins: {
-    legend: {
-      position: 'top' as const
-    },
-    title: {
-      display: true,
-      text: 'Rata-Rata Skor Kelayakan'
-    }
-  },
+  maintainAspectRatio: false,
   scales: {
     y: {
       beginAtZero: true,
-      max: 1
+      max: 1,
+      title: {
+        display: true,
+        text: 'Rata-rata Skor Kelayakan'
+      }
+    },
+    x: {
+      title: {
+        display: true,
+        text: 'Kategori'
+      }
+    }
+  },
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top' as const
+    },
+    tooltip: {
+      enabled: true
     }
   }
 }
 </script>
-
 <template>
   <Line :data="chartData" :options="options" />
 </template>

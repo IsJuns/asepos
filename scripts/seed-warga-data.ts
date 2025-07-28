@@ -77,6 +77,58 @@ function getRandomElement<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+// ✅ BARU: Daftar nama-nama manusia
+const firstNames = [
+  "Budi",
+  "Siti",
+  "Agus",
+  "Dewi",
+  "Joko",
+  "Ani",
+  "Rina",
+  "Fajar",
+  "Lina",
+  "Eko",
+  "Maya",
+  "Rio",
+  "Putri",
+  "Andi",
+  "Nurul",
+  "Dian",
+  "Bayu",
+  "Citra",
+  "Hadi",
+  "Wati",
+]
+const lastNames = [
+  "Santoso",
+  "Wijaya",
+  "Susanto",
+  "Dewi",
+  "Pratama",
+  "Utami",
+  "Saputra",
+  "Rahayu",
+  "Nugroho",
+  "Lestari",
+  "Setiawan",
+  "Handayani",
+  "Kusuma",
+  "Puspita",
+  "Aditya",
+  "Sari",
+  "Permana",
+  "Fitri",
+  "Hidayat",
+  "Indah",
+]
+
+function generateRandomName(): string {
+  const firstName = getRandomElement(firstNames)
+  const lastName = getRandomElement(lastNames)
+  return `${firstName} ${lastName}`
+}
+
 async function generateAndSeedWargaData(numFamilies = 50) {
   console.log(`Menghasilkan ${numFamilies} data keluarga...`)
   const wargaRecordsToSeed: Omit<Warga, "id" | "skorKelayakan">[] = []
@@ -94,8 +146,9 @@ async function generateAndSeedWargaData(numFamilies = 50) {
     const headRt = getRandomInt(1, 10)
     const headRw = getRandomInt(1, 5)
 
+    // ✅ PERBAIKAN: Gunakan nama manusia
     wargaRecordsToSeed.push({
-      nama: `Kepala Keluarga ${i + 1}`,
+      nama: generateRandomName(),
       nik: `32730000000000${String(i + 1).padStart(4, "0")}01`,
       nik_kk: nikKk,
       penghasilan: headPenghasilan,
@@ -109,8 +162,9 @@ async function generateAndSeedWargaData(numFamilies = 50) {
 
     for (let j = 0; j < numDependents; j++) {
       const dependentPenghasilan = getRandomInt(0, 2000000)
+      // ✅ PERBAIKAN: Gunakan nama manusia
       wargaRecordsToSeed.push({
-        nama: `Anggota Keluarga ${i + 1}-${j + 1}`,
+        nama: generateRandomName(),
         nik: `32730000000000${String(i + 1).padStart(4, "0")}${String(j + 2).padStart(2, "0")}`,
         nik_kk: nikKk,
         penghasilan: dependentPenghasilan,

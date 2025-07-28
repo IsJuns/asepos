@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { definePageMeta, useNuxtApp } from '#imports' // ✅ PERBAIKAN: Import definePageMeta dari #imports
-import type { Warga } from '@/types/warga' // ✅ Import tipe Warga
+import { definePageMeta, useNuxtApp } from '#imports'
+import type { Warga } from '@/types/warga'
 
 const router = useRouter()
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
 
-const dataWarga = ref<Warga[]>([]) // ✅ Terapkan tipe Warga[]
+const dataWarga = ref<Warga[]>([])
 const isLoading = ref(false)
 const searchQuery = ref('')
 const sortBy = ref<'nama' | 'skor' | 'nik_kk'>('skor')
@@ -25,20 +25,58 @@ const fetchData = async () => {
   dataWarga.value = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
-  } as Warga)) // ✅ Cast ke tipe Warga
+  } as Warga))
   isLoading.value = false
 }
 
-// ✅ PERBAIKAN: Logika SMART berbasis NIK KK
+// --- Fungsi Konversi Skor Baru (sesuai kriteria Anda) ---
+const getSkorPenghasilan = (penghasilan: number): number => {
+  if (penghasilan <= 1000000) return 1.0;
+  if (penghasilan <= 2000000) return 0.8;
+  if (penghasilan <= 3000000) return 0.6;
+  return 0.3; // > 3.000.000
+}
+
+const getSkorTanggungan = (jumlahTanggungan: number): number => {
+  if (jumlahTanggungan >= 4) return 1.0;
+  if (jumlahTanggungan >= 2) return 0.8; // 2-3 orang
+  if (jumlahTanggungan === 1) return 0.5;
+  return 0.3; // 0 orang
+}
+
+const getSkorKondisiRumah = (kondisi?: string): number => {
+  switch (kondisi?.toLowerCase()) {
+    case 'tidak layak huni': return 1.0;
+    case 'menumpang':
+    case 'sewa': return 0.8;
+    case 'rumah sendiri sederhana': return 0.6;
+    case 'rumah permanen bagus': return 0.3;
+    default: return 0.0; // Jika tidak ada data atau tidak cocok
+  }
+}
+
+const getSkorPekerjaan = (status?: string): number => {
+  switch (status?.toLowerCase()) {
+    case 'tidak bekerja': return 1.0;
+    case 'buruh harian': return 0.8;
+    case 'pedagang kecil': return 0.7;
+    case 'pekerja swasta': return 0.5;
+    case 'pns':
+    case 'pegawai tetap': return 0.3;
+    default: return 0.0; // Jika tidak ada data atau tidak cocok
+  }
+}
+// --- Akhir Fungsi Konversi Skor Baru ---
+
 const hitungSMART = async () => {
   isLoading.value = true
   try {
     const { collection, getDocs, doc, updateDoc } = await import('firebase/firestore')
     const snapshot = await getDocs(collection(db, 'data_warga'));
-    const dataWargaSaatIni: Warga[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warga)); // ✅ Terapkan tipe Warga
+    const dataWargaSaatIni: Warga[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warga));
 
     const dataKeluarga: Record<string, {
-      anggota: Warga[], // ✅ Terapkan tipe Warga
+      anggota: Warga[],
       totalPenghasilan: number,
       totalTanggungan: number,
       kondisiTempatTinggal: string,
@@ -50,7 +88,6 @@ const hitungSMART = async () => {
     dataWargaSaatIni.forEach(w => {
       const nikKk = w.nik_kk;
       if (!nikKk) return;
-
       if (!dataKeluarga[nikKk]) {
         dataKeluarga[nikKk] = {
           anggota: [],
@@ -67,39 +104,47 @@ const hitungSMART = async () => {
       dataKeluarga[nikKk].totalTanggungan += w.jumlah_tanggungan || 0;
     });
 
-    const allPenghasilanKeluarga = Object.values(dataKeluarga).map(k => k.totalPenghasilan);
-    const allTanggunganKeluarga = Object.values(dataKeluarga).map(k => k.totalTanggungan);
+    // Bobot Kriteria Baru
+    const W_PENGHASILAN = 0.4;
+    const W_TANGGUNGAN = 0.2;
+    const W_KONDISI = 0.2;
+    const W_PEKERJAAN = 0.2;
 
-    const maxPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.max(...allPenghasilanKeluarga) : 1;
-    const minPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.min(...allPenghasilanKeluarga) : 0;
-    const maxTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.max(...allTanggunganKeluarga) : 1;
-    const minTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.min(...allTanggunganKeluarga) : 0;
+    const totalBobot = W_PENGHASILAN + W_TANGGUNGAN + W_KONDISI + W_PEKERJAAN;
+    if (Math.abs(totalBobot - 1.0) > 0.001) {
+      console.warn(`Total bobot kriteria tidak sama dengan 1.0! Total: ${totalBobot}`);
+    }
 
     for (const nikKk in dataKeluarga) {
       const keluarga = dataKeluarga[nikKk];
 
-      const normPenghasilan = (maxPenghasilanKeluarga - keluarga.totalPenghasilan) / (maxPenghasilanKeluarga - minPenghasilanKeluarga || 1);
-      const normTanggungan = (keluarga.totalTanggungan - minTanggunganKeluarga) / (maxTanggunganKeluarga - minTanggunganKeluarga || 1);
-      const skorKondisi = getSkorKondisi(keluarga.kondisiTempatTinggal);
+      const skorPenghasilan = getSkorPenghasilan(keluarga.totalPenghasilan);
+      const skorTanggungan = getSkorTanggungan(keluarga.totalTanggungan);
+      const skorKondisi = getSkorKondisiRumah(keluarga.kondisiTempatTinggal);
       const skorPekerjaan = getSkorPekerjaan(keluarga.statusPekerjaan);
-      const normKondisi = (3 - skorKondisi) / 2;
-      const normPekerjaan = (skorPekerjaan - 1) / 2;
 
       const skorKelayakanKeluarga = parseFloat((
-        normPenghasilan * 0.4 +
-        normTanggungan * 0.2 +
-        normKondisi * 0.2 +
-        normPekerjaan * 0.2
+        skorPenghasilan * W_PENGHASILAN +
+        skorTanggungan * W_TANGGUNGAN +
+        skorKondisi * W_KONDISI +
+        skorPekerjaan * W_PEKERJAAN
       ).toFixed(3));
 
-      // Update skorKelayakan untuk setiap anggota keluarga
+      console.group(`Perhitungan SMART untuk NIK KK: ${nikKk}`);
+      console.log(`  Penghasilan: Rp ${keluarga.totalPenghasilan.toLocaleString('id-ID')} -> Skor: ${skorPenghasilan.toFixed(3)} (Kontribusi: ${(skorPenghasilan * W_PENGHASILAN).toFixed(3)})`);
+      console.log(`  Tanggungan: ${keluarga.totalTanggungan} orang -> Skor: ${skorTanggungan.toFixed(3)} (Kontribusi: ${(skorTanggungan * W_TANGGUNGAN).toFixed(3)})`);
+      console.log(`  Kondisi Tempat Tinggal: ${keluarga.kondisiTempatTinggal} -> Skor: ${skorKondisi.toFixed(3)} (Kontribusi: ${(skorKondisi * W_KONDISI).toFixed(3)})`);
+      console.log(`  Status Pekerjaan: ${keluarga.statusPekerjaan} -> Skor: ${skorPekerjaan.toFixed(3)} (Kontribusi: ${(skorPekerjaan * W_PEKERJAAN).toFixed(3)})`);
+      console.log(`  Skor Akhir Kelayakan: ${skorKelayakanKeluarga}`);
+      console.groupEnd();
+
       for (const anggota of keluarga.anggota) {
         const wargaRef = doc(db, 'data_warga', anggota.id);
         await updateDoc(wargaRef, { skorKelayakan: skorKelayakanKeluarga });
       }
     }
     alert('✅ Perhitungan SMART berhasil & skor tersimpan!');
-    await fetchData(); // Refresh data setelah perhitungan
+    await fetchData(); // Refresh data di tabel setelah perhitungan
   } catch (error) {
     console.error('Gagal menghitung SMART:', error);
     alert('❌ Gagal menghitung SMART: ' + error);
@@ -108,7 +153,6 @@ const hitungSMART = async () => {
   }
 }
 
-// computed untuk pencarian + sorting
 const filteredWarga = computed(() => {
   const filtered = dataWarga.value.filter(w =>
     w.nama.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -122,24 +166,6 @@ const filteredWarga = computed(() => {
     return [...filtered].sort((a, b) => a.nama.localeCompare(b.nama))
   }
 })
-
-const getSkorKondisi = (val: string) => {
-  switch (val) {
-    case 'Menumpang': return 1
-    case 'Kontrak': return 2
-    case 'Milik Sendiri': return 3
-    default: return 3
-  }
-}
-
-const getSkorPekerjaan = (val: string) => {
-  switch (val) {
-    case 'Tidak Bekerja': return 1
-    case 'Pelajar/Mahasiswa': return 2
-    case 'Bekerja': return 3
-    default: return 3
-  }
-}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -157,12 +183,11 @@ const getScoreClass = (score?: number) => {
   return 'bg-red-100 text-red-800';
 }
 
-// Export ke Excel
 const exportToExcel = async () => {
   if (process.client) {
     const fileSaver = await import('file-saver')
     const saveAs = fileSaver.saveAs
-    const wsData = dataWarga.value.map((w: Warga) => ({ // ✅ Terapkan tipe Warga
+    const wsData = dataWarga.value.map((w: Warga) => ({
       Nama: w.nama,
       'NIK KTP': w.nik,
       'NIK KK': w.nik_kk,
@@ -181,7 +206,6 @@ const exportToExcel = async () => {
   }
 }
 
-// Export ke PDF
 const exportToPDF = async () => {
   if (process.client) {
     const jspdfModule = await import('jspdf')
@@ -192,7 +216,7 @@ const exportToPDF = async () => {
     doc.text('Data Warga & Skor Kelayakan', 14, 15)
     autoTable(doc, {
       head: [['Nama', 'NIK KTP', 'NIK KK', 'Penghasilan', 'Tanggungan', 'Kondisi', 'Pekerjaan', 'Skor']],
-      body: dataWarga.value.map((w: Warga) => [ // ✅ Terapkan tipe Warga
+      body: dataWarga.value.map((w: Warga) => [
         w.nama,
         w.nik,
         w.nik_kk,
@@ -208,23 +232,8 @@ const exportToPDF = async () => {
   }
 }
 
-onMounted(() => {
-  fetchData()
-})
-
-definePageMeta({
-  title: 'Output Data Warga',
-  middleware: ['auth'],
-})
-
-// Import dinamis untuk jspdf dan file-saver
-let jsPDF: any
-let autoTable: any
-let saveAs: any
-
-// Modal state
 const showEditModal = ref(false)
-const selectedWarga = reactive<Warga>({ // ✅ Terapkan tipe Warga
+const selectedWarga = reactive<Warga>({
   id: '',
   nama: '',
   nik: '',
@@ -233,17 +242,15 @@ const selectedWarga = reactive<Warga>({ // ✅ Terapkan tipe Warga
   jumlah_tanggungan: 0,
   kondisi_tempat_tinggal: '',
   status_pekerjaan: '',
-  rt: 0, // Default ke 0 atau sesuaikan
-  rw: 0  // Default ke 0 atau sesuaikan
+  rt: 0,
+  rw: 0
 })
 
-// Buka modal dengan data
-const editWarga = (warga: Warga) => { // ✅ Terapkan tipe Warga
+const editWarga = (warga: Warga) => {
   Object.assign(selectedWarga, warga)
   showEditModal.value = true
 }
 
-// Simpan hasil edit ke Firestore
 const simpanPerubahan = async () => {
   if (!selectedWarga.id) return
   try {
@@ -268,8 +275,7 @@ const simpanPerubahan = async () => {
   }
 }
 
-// Fungsi untuk menghapus data warga
-const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
+const deleteWarga = async (warga: Warga) => {
   if (confirm(`Apakah Anda yakin ingin menghapus data ${warga.nama} (NIK: ${warga.nik})?`)) {
     try {
       const { doc, deleteDoc } = await import('firebase/firestore')
@@ -281,6 +287,15 @@ const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
     }
   }
 }
+
+onMounted(() => {
+  fetchData()
+})
+
+definePageMeta({
+  title: 'Output Data Warga',
+  middleware: ['auth'],
+})
 </script>
 
 <template>
@@ -288,7 +303,7 @@ const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
     <div class="flex items-center justify-between">
       <h1 class="text-3xl font-bold tracking-tight">Output Data Warga</h1>
     </div>
-    
+
     <Card>
       <CardHeader>
         <CardTitle>Data Warga & Skor Kelayakan</CardTitle>
@@ -310,11 +325,11 @@ const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
             <Button variant="outline" @click="exportToPDF">Export ke PDF</Button>
           </div>
         </div>
-        
+
         <!-- Data Table -->
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto max-h-[calc(100vh-350px)] overflow-y-auto">
           <Table class="min-w-full divide-y divide-gray-200">
-            <TableHeader class="bg-gray-50">
+            <TableHeader class="bg-gray-50 sticky top-0 z-10">
               <TableRow>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</TableHead>
                 <TableHead class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIK KTP</TableHead>
@@ -360,7 +375,7 @@ const deleteWarga = async (warga: Warga) => { // ✅ Terapkan tipe Warga
         </div>
       </CardContent>
     </Card>
-    
+
     <!-- Edit Modal -->
     <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div class="bg-white p-6 rounded-xl shadow-md w-full max-w-xl space-y-4">

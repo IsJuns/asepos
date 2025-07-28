@@ -48,11 +48,7 @@ const criteria = [
         <Progress :value="criterion.weight" class="h-2" />
       </div>
       
-      <div class="mt-4 p-3 bg-muted rounded-lg">
-        <p class="text-xs text-muted-foreground">
-          <strong>Metode SMART:</strong> Simple Multi-Attribute Rating Technique digunakan untuk menentukan kelayakan bantuan sosial berdasarkan kriteria yang telah ditetapkan.
-        </p>
-      </div>
+      <!-- ✅ DIHAPUS: Penjelasan metode SMART dipindahkan ke halaman pengaturan -->
     </CardContent>
   </Card>
 </template>

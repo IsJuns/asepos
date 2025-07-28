@@ -1,122 +1,157 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
-import { Bar } from 'vue-chartjs'
-import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
+import { ref, watch, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNuxtApp } from '#app'
-import type { Warga } from '~/types/warga' // ✅ Import tipe Warga
+import type { Warga } from '@/types/warga'
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore' // Import Firestore functions
+
+// Import komponen chart kustom Anda
+import BarChart from '~/components/BarChart.vue'
+import LineChart from '~/components/LineChart.vue'
 
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
 
-// Register Chart.js components
-const ChartJSInstance = ChartJS
-ChartJSInstance.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
-
-const chartMode = ref<'RT' | 'RW'>('RT')
+const chartMode = ref<'overall' | 'RT' | 'RW'>('overall')
+const chartType = ref<'bar' | 'line'>('line')
 const chartLabels = ref<string[]>([])
 const chartData = ref<number[]>([])
 const isLoading = ref(false)
 
 const props = defineProps<{
-  allWarga: Warga[] // ✅ Terapkan tipe Warga[]
+  allWarga: Warga[]
 }>()
 
 const emit = defineEmits(['refresh-dashboard'])
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    y: {
-      beginAtZero: true,
-      max: 1,
-      title: {
-        display: true,
-        text: 'Rata-rata Skor Kelayakan'
-      }
-    },
-    x: {
-      title: {
-        display: true,
-        text: 'RT/RW'
-      }
-    }
-  },
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      callbacks: {
-        label: function(context: any) {
-          let label = context.dataset.label || '';
-          if (label) {
-            label += ': ';
-          }
-          if (context.parsed.y !== null) {
-            label += context.parsed.y.toFixed(3);
-          }
-          return label;
+const processChartData = () => {
+  if (props.allWarga.length === 0) {
+    chartLabels.value = [];
+    chartData.value = [];
+    console.log('Tidak ada data warga untuk diproses chart.');
+    return;
+  }
+
+  const groupedData: Record<string, { totalSkor: number, count: number }> = {}
+
+  if (chartMode.value === 'overall') {
+    props.allWarga.forEach(w => {
+      if (typeof w.skorKelayakan === 'number') {
+        const keyRT = `RT ${w.rt}`
+        const keyRW = `RW ${w.rw}`
+
+        if (!groupedData[keyRT]) {
+          groupedData[keyRT] = { totalSkor: 0, count: 0 }
         }
+        groupedData[keyRT].totalSkor += w.skorKelayakan
+        groupedData[keyRT].count++
+
+        if (!groupedData[keyRW]) {
+          groupedData[keyRW] = { totalSkor: 0, count: 0 }
+        }
+        groupedData[keyRW].totalSkor += w.skorKelayakan
+        groupedData[keyRW].count++
       }
-    }
+    })
+
+    const sortedKeys = Object.keys(groupedData).sort((a, b) => {
+      const typeA = a.split(' ')[0];
+      const numA = parseInt(a.split(' ')[1]);
+      const typeB = b.split(' ')[0];
+      const numB = parseInt(b.split(' ')[1]);
+
+      if (typeA === typeB) {
+        return numA - numB;
+      }
+      return typeA === 'RT' ? -1 : 1;
+    });
+
+    chartLabels.value = sortedKeys;
+    chartData.value = sortedKeys.map(key => {
+      const data = groupedData[key];
+      return data.count > 0 ? parseFloat((data.totalSkor / data.count).toFixed(3)) : 0;
+    });
+    chartType.value = 'line';
+  } else {
+    props.allWarga.forEach(w => {
+      if (typeof w.skorKelayakan === 'number') {
+        const key = chartMode.value === 'RT' ? `RT ${w.rt}` : `RW ${w.rw}`
+        if (!groupedData[key]) {
+          groupedData[key] = { totalSkor: 0, count: 0 }
+        }
+        groupedData[key].totalSkor += w.skorKelayakan
+        groupedData[key].count++
+      }
+    })
+
+    const sortedKeys = Object.keys(groupedData).sort((a, b) => {
+      const numA = parseInt(a.split(' ')[1])
+      const numB = parseInt(b.split(' ')[1])
+      return numA - numB
+    })
+
+    chartLabels.value = sortedKeys
+    chartData.value = sortedKeys.map(key => {
+      const data = groupedData[key]
+      return data.count > 0 ? parseFloat((data.totalSkor / data.count).toFixed(3)) : 0
+    })
+    chartType.value = 'line';
+  }
+  console.log('Chart Labels (after process):', chartLabels.value);
+  console.log('Chart Data (after process):', chartData.value);
+  console.log('Chart Type (after process):', chartType.value);
+}
+
+// --- Fungsi Konversi Skor Baru ---
+const getSkorPenghasilan = (penghasilan: number): number => {
+  if (penghasilan <= 1000000) return 1.0;
+  if (penghasilan <= 2000000) return 0.8;
+  if (penghasilan <= 3000000) return 0.6;
+  return 0.3; // > 3.000.000
+}
+
+const getSkorTanggungan = (jumlahTanggungan: number): number => {
+  if (jumlahTanggungan >= 4) return 1.0;
+  if (jumlahTanggungan >= 2) return 0.8; // 2-3 orang
+  if (jumlahTanggungan === 1) return 0.5;
+  return 0.3; // 0 orang
+}
+
+const getSkorKondisiRumah = (kondisi?: string): number => {
+  switch (kondisi?.toLowerCase()) {
+    case 'tidak layak huni': return 1.0;
+    case 'menumpang':
+    case 'sewa': return 0.8;
+    case 'rumah sendiri sederhana': return 0.6;
+    case 'rumah permanen bagus': return 0.3;
+    default: return 0.0; // Jika tidak ada data atau tidak cocok
   }
 }
 
-const processChartData = () => {
-  const groupedData: Record<string, { totalSkor: number, count: number }> = {}
-
-  props.allWarga.forEach(w => {
-    if (typeof w.skorKelayakan === 'number') {
-      const key = chartMode.value === 'RT' ? `RT ${w.rt}` : `RW ${w.rw}`
-      if (!groupedData[key]) {
-        groupedData[key] = { totalSkor: 0, count: 0 }
-      }
-      groupedData[key].totalSkor += w.skorKelayakan
-      groupedData[key].count++
-    }
-  })
-
-  const sortedKeys = Object.keys(groupedData).sort((a, b) => {
-    const numA = parseInt(a.split(' ')[1])
-    const numB = parseInt(b.split(' ')[1])
-    return numA - numB
-  })
-
-  chartLabels.value = sortedKeys
-  chartData.value = sortedKeys.map(key => {
-    const data = groupedData[key]
-    return data.count > 0 ? parseFloat((data.totalSkor / data.count).toFixed(3)) : 0
-  })
+const getSkorPekerjaan = (status?: string): number => {
+  switch (status?.toLowerCase()) {
+    case 'tidak bekerja': return 1.0;
+    case 'buruh harian': return 0.8;
+    case 'pedagang kecil': return 0.7;
+    case 'pekerja swasta': return 0.5;
+    case 'pns':
+    case 'pegawai tetap': return 0.3;
+    default: return 0.0; // Jika tidak ada data atau tidak cocok
+  }
 }
-
-const chartDataset = computed(() => ({
-  labels: chartLabels.value,
-  datasets: [
-    {
-      label: 'Rata-rata Skor Kelayakan',
-      backgroundColor: '#42A5F5',
-      data: chartData.value
-    }
-  ]
-}))
-
-watch([() => props.allWarga, chartMode], () => {
-  processChartData()
-}, { deep: true, immediate: true })
+// --- Akhir Fungsi Konversi Skor Baru ---
 
 const hitungSMARTAndRefresh = async () => {
   isLoading.value = true;
   try {
-    const { collection, getDocs, doc, updateDoc } = await import('firebase/firestore')
     const snapshot = await getDocs(collection(db, 'data_warga'));
-    const dataWargaSaatIni: Warga[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warga)); // ✅ Terapkan tipe Warga
+    const dataWargaSaatIni: Warga[] = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Warga));
 
-    // ✅ PERBAIKAN: Agregasi data per NIK KK
+    console.log('Fetched allWarga for SMART calculation:', dataWargaSaatIni);
+
     const dataKeluarga: Record<string, {
-      anggota: Warga[], // ✅ Terapkan tipe Warga
+      anggota: Warga[],
       totalPenghasilan: number,
       totalTanggungan: number,
       kondisiTempatTinggal: string,
@@ -128,7 +163,6 @@ const hitungSMARTAndRefresh = async () => {
     dataWargaSaatIni.forEach(w => {
       const nikKk = w.nik_kk;
       if (!nikKk) return;
-
       if (!dataKeluarga[nikKk]) {
         dataKeluarga[nikKk] = {
           anggota: [],
@@ -145,32 +179,40 @@ const hitungSMARTAndRefresh = async () => {
       dataKeluarga[nikKk].totalTanggungan += w.jumlah_tanggungan || 0;
     });
 
-    const allPenghasilanKeluarga = Object.values(dataKeluarga).map(k => k.totalPenghasilan);
-    const allTanggunganKeluarga = Object.values(dataKeluarga).map(k => k.totalTanggungan);
+    // Bobot Kriteria Baru
+    const W_PENGHASILAN = 0.4;
+    const W_TANGGUNGAN = 0.2;
+    const W_KONDISI = 0.2;
+    const W_PEKERJAAN = 0.2;
 
-    const maxPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.max(...allPenghasilanKeluarga) : 1;
-    const minPenghasilanKeluarga = allPenghasilanKeluarga.length > 0 ? Math.min(...allPenghasilanKeluarga) : 0;
-    const maxTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.max(...allTanggunganKeluarga) : 1;
-    const minTanggunganKeluarga = allTanggunganKeluarga.length > 0 ? Math.min(...allTanggunganKeluarga) : 0;
+    const totalBobot = W_PENGHASILAN + W_TANGGUNGAN + W_KONDISI + W_PEKERJAAN;
+    if (Math.abs(totalBobot - 1.0) > 0.001) {
+      console.warn(`Total bobot kriteria tidak sama dengan 1.0! Total: ${totalBobot}`);
+    }
 
     for (const nikKk in dataKeluarga) {
       const keluarga = dataKeluarga[nikKk];
 
-      const normPenghasilan = (maxPenghasilanKeluarga - keluarga.totalPenghasilan) / (maxPenghasilanKeluarga - minPenghasilanKeluarga || 1);
-      const normTanggungan = (keluarga.totalTanggungan - minTanggunganKeluarga) / (maxTanggunganKeluarga - minTanggunganKeluarga || 1);
-      const skorKondisi = getSkorKondisi(keluarga.kondisiTempatTinggal);
+      const skorPenghasilan = getSkorPenghasilan(keluarga.totalPenghasilan);
+      const skorTanggungan = getSkorTanggungan(keluarga.totalTanggungan);
+      const skorKondisi = getSkorKondisiRumah(keluarga.kondisiTempatTinggal);
       const skorPekerjaan = getSkorPekerjaan(keluarga.statusPekerjaan);
-      const normKondisi = (3 - skorKondisi) / 2;
-      const normPekerjaan = (skorPekerjaan - 1) / 2;
 
       const skorKelayakanKeluarga = parseFloat((
-        normPenghasilan * 0.4 +
-        normTanggungan * 0.2 +
-        normKondisi * 0.2 +
-        normPekerjaan * 0.2
+        skorPenghasilan * W_PENGHASILAN +
+        skorTanggungan * W_TANGGUNGAN +
+        skorKondisi * W_KONDISI +
+        skorPekerjaan * W_PEKERJAAN
       ).toFixed(3));
 
-      // Update skorKelayakan untuk setiap anggota keluarga
+      console.group(`Perhitungan SMART untuk NIK KK: ${nikKk}`);
+      console.log(`  Penghasilan: Rp ${keluarga.totalPenghasilan.toLocaleString('id-ID')} -> Skor: ${skorPenghasilan.toFixed(3)} (Kontribusi: ${(skorPenghasilan * W_PENGHASILAN).toFixed(3)})`);
+      console.log(`  Tanggungan: ${keluarga.totalTanggungan} orang -> Skor: ${skorTanggungan.toFixed(3)} (Kontribusi: ${(skorTanggungan * W_TANGGUNGAN).toFixed(3)})`);
+      console.log(`  Kondisi Tempat Tinggal: ${keluarga.kondisiTempatTinggal} -> Skor: ${skorKondisi.toFixed(3)} (Kontribusi: ${(skorKondisi * W_KONDISI).toFixed(3)})`);
+      console.log(`  Status Pekerjaan: ${keluarga.statusPekerjaan} -> Skor: ${skorPekerjaan.toFixed(3)} (Kontribusi: ${(skorPekerjaan * W_PEKERJAAN).toFixed(3)})`);
+      console.log(`  Skor Akhir Kelayakan: ${skorKelayakanKeluarga}`);
+      console.groupEnd();
+
       for (const anggota of keluarga.anggota) {
         const wargaRef = doc(db, 'data_warga', anggota.id);
         await updateDoc(wargaRef, { skorKelayakan: skorKelayakanKeluarga });
@@ -184,32 +226,25 @@ const hitungSMARTAndRefresh = async () => {
   } finally {
     isLoading.value = false;
   }
-};
-
-const getSkorKondisi = (val: string) => {
-  switch (val) {
-    case 'Menumpang': return 1
-    case 'Kontrak': return 2
-    case 'Milik Sendiri': return 3
-    default: return 3
-  }
 }
 
-const getSkorPekerjaan = (val: string) => {
-  switch (val) {
-    case 'Tidak Bekerja': return 1
-    case 'Pelajar/Mahasiswa': return 2
-    case 'Bekerja': return 3
-    default: return 3
-  }
-}
+watch([() => props.allWarga, chartMode], () => {
+  processChartData()
+}, { deep: true, immediate: true })
 </script>
 
 <template>
   <Card class="p-6">
     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle class="text-lg font-semibold">Rata-rata Skor Kelayakan per {{ chartMode }}</CardTitle>
+      <CardTitle class="text-lg font-semibold">Rata-rata Skor Kelayakan</CardTitle>
       <div class="flex gap-2">
+        <Button
+          size="sm"
+          :variant="chartMode === 'overall' ? 'default' : 'outline'"
+          @click="chartMode = 'overall'"
+        >
+          Keseluruhan
+        </Button>
         <Button
           size="sm"
           :variant="chartMode === 'RT' ? 'default' : 'outline'"
@@ -226,6 +261,20 @@ const getSkorPekerjaan = (val: string) => {
         </Button>
         <Button
           size="sm"
+          :variant="chartType === 'bar' ? 'default' : 'outline'"
+          @click="chartType = 'bar'"
+        >
+          Bar
+        </Button>
+        <Button
+          size="sm"
+          :variant="chartType === 'line' ? 'default' : 'outline'"
+          @click="chartType = 'line'"
+        >
+          Line
+        </Button>
+        <Button
+          size="sm"
           variant="secondary"
           @click="hitungSMARTAndRefresh"
           :disabled="isLoading"
@@ -236,7 +285,18 @@ const getSkorPekerjaan = (val: string) => {
     </CardHeader>
     <CardContent>
       <div class="h-[300px]">
-        <Bar :data="chartDataset" :options="chartOptions" />
+        <ClientOnly>
+          <BarChart v-if="chartType === 'bar'" :labels="chartLabels" :data="chartData" />
+          <LineChart v-else :labels="chartLabels" :data="chartData" />
+          <template #fallback>
+            <div class="flex items-center justify-center h-full text-gray-500">
+              Memuat grafik...
+            </div>
+          </template>
+        </ClientOnly>
+        <div v-if="chartLabels.length === 0 && !isLoading" class="flex items-center justify-center h-full text-gray-500">
+          Tidak ada data untuk menampilkan grafik.
+        </div>
       </div>
     </CardContent>
   </Card>

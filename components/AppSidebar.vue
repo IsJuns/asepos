@@ -1,31 +1,31 @@
 <script setup lang="ts">
 import { 
-Home, 
-Users, 
-FileText, 
-BarChart3, 
-Settings, 
-LogOut, 
-Building2, // Tetap impor jika masih digunakan di tempat lain, atau hapus jika tidak
-ChevronDown,
-MapPin
+  Home, 
+  Users, 
+  FileText, 
+  BarChart3, 
+  Settings, 
+  LogOut, 
+  Building2,
+  ChevronDown,
+  MapPin
 } from "lucide-vue-next"
 import {
-Sidebar,
-SidebarContent,
-SidebarGroup,
-SidebarGroupContent,
-SidebarGroupLabel,
-SidebarHeader,
-SidebarMenu,
-SidebarMenuButton,
-SidebarMenuItem,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-DropdownMenu,
-DropdownMenuContent,
-DropdownMenuItem,
-DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
 // ✅ PERBAIKAN: Data kelurahan disesuaikan dengan Babakan Asih
@@ -37,50 +37,60 @@ const kelurahanData = {
 
 // Menu items utama
 const mainMenuItems = [
-{
-  title: "Dashboard",
-  url: "/dashboard",
-  icon: Home,
-  description: "Halaman utama sistem"
-},
-{
-  title: "Input Data Warga",
-  url: "/inputData",
-  icon: Users,
-  description: "Form input data warga"
-},
-{
-  title: "Output Data",
-  url: "/outputData",
-  icon: FileText,
-  description: "Lihat dan kelola data warga"
-},
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+    description: "Halaman utama sistem"
+  },
+  {
+    title: "Input Data Warga",
+    url: "/inputData",
+    icon: Users,
+    description: "Form input data warga"
+  },
+  {
+    title: "Output Data",
+    url: "/outputData",
+    icon: FileText,
+    description: "Lihat dan kelola data warga"
+  },
 ]
 
 // Menu API Reference
 const apiItems = [
-{
-  title: "Components",
-  url: "#",
-  icon: BarChart3,
-  description: "Komponen sistem"
-},
+  {
+    title: "Components",
+    url: "#",
+    icon: BarChart3,
+    description: "Komponen sistem"
+  },
+]
+
+// ✅ BARU: Menu Konfigurasi
+const configItems = [
+  {
+    title: "Pengaturan SMART",
+    url: "/settings/smart-config",
+    icon: Settings, // Menggunakan ikon Settings
+    description: "Konfigurasi bobot kriteria SMART"
+  },
 ]
 
 // Menu Account
 const accountItems = [
-{
-  title: "Settings",
-  url: "#",
-  icon: Settings,
-  description: "Pengaturan sistem"
-},
-{
-  title: "Logout",
-  url: "/logout",
-  icon: LogOut,
-  description: "Keluar dari sistem"
-},
+  {
+    title: "Settings",
+    url: "#", // Ini bisa diarahkan ke halaman pengaturan umum jika ada
+    icon: Settings,
+    description: "Pengaturan sistem"
+  },
+  {
+    title: "Logout",
+    url: "/logout",
+    icon: LogOut,
+    description: "Keluar dari sistem"
+  },
 ]
 </script>
 
@@ -96,7 +106,7 @@ const accountItems = [
               class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar -->
-              <img src="/assets/image/basih.png" alt="Kelurahan Babakan Asih Logo" class="size-8 object-contain" />
+              <img src="/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-8 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs">{{ kelurahanData.district }}</span>
@@ -112,7 +122,7 @@ const accountItems = [
           >
             <DropdownMenuItem class="gap-2 p-2">
               <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar di dropdown -->
-              <img src="/assets/image/basih.png" alt="Kelurahan Babakan Asih Logo" class="size-6 object-contain" />
+              <img src="/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-6 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs text-muted-foreground">{{ kelurahanData.district }}</span>
@@ -162,6 +172,23 @@ const accountItems = [
                 <component :is="item.icon" class="size-4" />
                 <span>{{ item.title }}</span>
               </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+
+    <!-- ✅ BARU: Configuration Section -->
+    <SidebarGroup>
+      <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem v-for="item in configItems" :key="item.title">
+            <SidebarMenuButton as-child :tooltip="item.description">
+              <NuxtLink :to="item.url" class="flex items-center gap-2">
+                <component :is="item.icon" class="size-4" />
+                <span>{{ item.title }}</span>
+              </NuxtLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -18,8 +18,11 @@ import {
 import { Separator } from '@/components/ui/separator'
 
 const route = useRoute()
-const hideLayoutOn = ['/register', '/login']
+const hideLayoutOn = ['/register', '/login'] // Fixed typo: '/login'
 const isHidden = computed(() => hideLayoutOn.includes(route.path))
+
+// Ensure all hooks are called at the top level
+const separator = Separator
 </script>
 
 <template>
@@ -27,14 +30,14 @@ const isHidden = computed(() => hideLayoutOn.includes(route.path))
     <slot />
   </div>
   <!-- ✅ PERBAIKAN: Kontainer utama adalah flex dan mengisi tinggi viewport -->
-  <div v-else class="min-h-screen bg-muted flex h-svh">
+  <!-- Hapus min-h-svh dari sini agar konten utama bisa menentukan tinggi keseluruhan -->
+  <div v-else class="bg-muted flex h-svh">
     <!-- SidebarProvider membungkus sidebar dan konten utama -->
     <SidebarProvider class="group/sidebar-wrapper">
       <!-- AppSidebar (yang berisi komponen Sidebar shadcn) -->
       <AppSidebar />
       
       <!-- SidebarInset akan menjadi area konten utama yang "inset" -->
-      <!-- ✅ PERBAIKAN: Hapus ml-[var(--sidebar-width)] karena SidebarInset akan menyesuaikan sendiri. -->
       <!-- Tambahkan flex-1 untuk mengambil sisa ruang horizontal. -->
       <SidebarInset class="flex-1 flex flex-col bg-background rounded-xl shadow border border-border">
         <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
@@ -52,10 +55,11 @@ const isHidden = computed(() => hideLayoutOn.includes(route.path))
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <Separator orientation="vertical" class="mr-2 h-4" />
+          <component :is="separator" orientation="vertical" class="mr-2 h-4" />
         </header>
         <!-- Konten halaman akan dirender di sini -->
-        <div class="flex-1 p-6">
+        <!-- ✅ PERBAIKAN: Tambahkan overflow-y-auto agar konten di dalam slot bisa discroll -->
+        <div class="flex-1 p-6 overflow-y-auto">
           <slot />
         </div>
       </SidebarInset>
