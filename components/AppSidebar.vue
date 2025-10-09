@@ -106,7 +106,7 @@ const accountItems = [
               class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar -->
-              <img src="/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-8 object-contain" />
+              <img src="@/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-8 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs">{{ kelurahanData.district }}</span>
@@ -122,7 +122,7 @@ const accountItems = [
           >
             <DropdownMenuItem class="gap-2 p-2">
               <!-- ✅ PERBAIKAN: Ganti ikon Building2 dengan logo gambar di dropdown -->
-              <img src="/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-6 object-contain" />
+              <img src="@/assets/image/Basih.png" alt="Kelurahan Babakan Asih Logo" class="size-6 object-contain" />
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">{{ kelurahanData.name }}</span>
                 <span class="truncate text-xs text-muted-foreground">{{ kelurahanData.district }}</span>

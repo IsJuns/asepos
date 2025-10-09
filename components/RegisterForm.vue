@@ -103,7 +103,7 @@ async function handleRegister() {
         </form>
         <div class="bg-muted relative hidden md:block">
           <img
-            src="/assets/image/gamarlogin.jfif"
+            src="@/assets/image/gambar.jfif"
             alt="Image"
             class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           />

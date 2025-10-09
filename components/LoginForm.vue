@@ -156,7 +156,7 @@ const handleLogin = async () => {
             </div>
             <div class="grid grid-cols-1 gap-4">
               <Button variant="outline" type="button" class="w-full" @click="handleGoogleLogin" :disabled="!auth">
-                <img src="/assets/icon/google.svg" alt="Login with Google" class="h-4 w-4 mr-2" />
+                <img src="@/assets/icon/google.svg" alt="Login with Google" class="h-4 w-4 mr-2" />
                 <span>Login dengan Google</span>
               </Button>
             </div>
@@ -170,7 +170,7 @@ const handleLogin = async () => {
         </form>
         <div class="bg-muted relative hidden md:block">
           <img
-            src="/assets/image/gamarlogin.jfif"
+            src="@/assets/image/gambar.jfif"
             alt="Image"
             class="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           >
