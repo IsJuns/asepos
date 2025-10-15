@@ -14,6 +14,7 @@ import KondisiTempatTinggalChart from '~/components/KondisiTempatTinggalChart.vu
 import { useDashboardData } from '@/composables/useDashboardData'
 import { collection, addDoc } from 'firebase/firestore'
 import { useNuxtApp } from '#app'
+import { doc, setDoc, getDocs } from "firebase/firestore";
 
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
@@ -129,14 +130,93 @@ const handleAnalisis = () => {
   console.log('Analisis clicked!');
 }
 
+// Hitung metrik performa sistem berdasarkan hasil klasifikasi
+const calculateSystemMetrics = async () => {
+  try {
+    const wargaSnapshot = await getDocs(collection(db, "data_warga"));
+    const wargaData = wargaSnapshot.docs.map((doc) => doc.data() as Warga);
+
+    // Data ground truth (label sebenarnya) dan prediksi (hasil sistem)
+    const trueLabels = wargaData.map((w) => w.status_aktual);
+    const predictedLabels = wargaData.map((w) => w.hasil_sistem);
+
+    // Definisi kelas dan confusion matrix
+    const classes = ["Layak", "Pertimbangan", "Tidak Layak"];
+    const matrix: Record<string, Record<string, number>> = {
+      Layak: { Layak: 0, Pertimbangan: 0, "Tidak Layak": 0 },
+      Pertimbangan: { Layak: 0, Pertimbangan: 0, "Tidak Layak": 0 },
+      "Tidak Layak": { Layak: 0, Pertimbangan: 0, "Tidak Layak": 0 },
+    };
+
+    // Loop semua data warga
+    for (let i = 0; i < trueLabels.length; i++) {
+      const actual: string = trueLabels[i] ? String(trueLabels[i]) : "Tidak Layak";
+      const predicted: string = predictedLabels[i] ? String(predictedLabels[i]) : "Tidak Layak";
+
+      if (matrix[actual] && matrix[actual][predicted] !== undefined) {
+        matrix[actual][predicted]++;
+      }
+    }
+
+    // Hitung metrik dasar
+    const total = trueLabels.length;
+    const correct = trueLabels.filter((v, i) => v === predictedLabels[i]).length;
+    const akurasi = ((correct / total) * 100).toFixed(1);
+
+    // Precision, Recall, F1-score (rata-rata per kelas)
+    let precisionSum = 0,
+      recallSum = 0,
+      f1Sum = 0;
+
+    classes.forEach((cls) => {
+      const tp = matrix[cls][cls];
+      const fp = classes.reduce((sum, c) => sum + (c !== cls ? matrix[c][cls] : 0), 0);
+      const fn = classes.reduce((sum, c) => sum + (c !== cls ? matrix[cls][c] : 0), 0);
+
+      const precision = tp + fp === 0 ? 0 : tp / (tp + fp);
+      const recall = tp + fn === 0 ? 0 : tp / (tp + fn);
+      const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+
+      precisionSum += precision;
+      recallSum += recall;
+      f1Sum += f1;
+    });
+
+    const precision = ((precisionSum / classes.length) * 100).toFixed(1);
+    const recall = ((recallSum / classes.length) * 100).toFixed(1);
+    const f1score = ((f1Sum / classes.length) * 100).toFixed(1);
+
+    // Simpan ke Firestore
+    const metricsRef = doc(db, "system", "metrics");
+    await setDoc(metricsRef, {
+      akurasi: parseFloat(akurasi),
+      precision: parseFloat(precision),
+      recall: parseFloat(recall),
+      f1score: parseFloat(f1score),
+      confusionMatrix: matrix,
+      updatedAt: new Date(),
+    });
+
+    console.log("✅ Metrik sistem berhasil diperbarui:", {
+      akurasi,
+      precision,
+      recall,
+      f1score,
+    });
+  } catch (error) {
+    console.error("❌ Gagal menghitung metrik sistem:", error);
+  }
+};
+
 definePageMeta({
   title: 'Dashboard',
   middleware: ['auth'],
 })
 
-onMounted(() => {
-  fetchDashboardData()
-})
+onMounted(async () => {
+  await fetchDashboardData();
+  await calculateSystemMetrics(); // <--- tambahkan di sini
+});
 </script>
 
 <template>

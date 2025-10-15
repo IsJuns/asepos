@@ -1,16 +1,50 @@
 <script setup lang="ts">
-import { definePageMeta, ref } from '#imports'
+import { definePageMeta, ref, onMounted, useNuxtApp } from "#imports";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore"
 
 definePageMeta({
   title: 'Settings',
   middleware: ['auth'],
 })
+
+// Ambil db dari Nuxt plugin
+const { $firebase } = useNuxtApp();
+const db = $firebase.db; // ✅ akses Firestore dari plugin
+
+type Label = 'layak' | 'pertimbangan' | 'tidakLayak';
+
+const confusionMatrix: Record<Label, Record<Label, number>> = {
+  layak: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
+  pertimbangan: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
+  tidakLayak: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
+};
+
+
+const fetchConfusionMatrix = async () => {
+  const wargaRef = collection(db, "warga")
+  const querySnap = await getDocs(wargaRef)
+  const data = querySnap.docs.map((d) => d.data())
+
+  // Hitung confusion matrix dari data sebenarnya
+  data.forEach((d: any) => {
+    const actual = d.kelayakan_aktual
+    const predicted = d.kelayakan_prediksi
+
+    if (confusionMatrix[predicted as Label] && confusionMatrix[predicted as Label][actual as Label] !== undefined) {
+      confusionMatrix[predicted as Label][actual as Label]++;
+}
+
+  })
+
+  console.log("✅ Confusion Matrix Updated:", confusionMatrix)
+}
 
 // Contoh state untuk pengaturan
 const smartWeightPenghasilan = ref(0.4)
@@ -20,6 +54,12 @@ const smartWeightPekerjaan = ref(0.2)
 
 const thresholdLayak = ref(0.8)
 const thresholdPertimbangan = ref(0.4)
+
+const overallAccuracy = ref(0);
+const precision = ref(0);
+const recall = ref(0);
+const f1Score = ref(0);
+const metrics = ref<any>(null);
 
 const saveSettings = () => {
   // Logika untuk menyimpan pengaturan ke database atau konfigurasi
@@ -43,11 +83,31 @@ useHead({
   ]
 })
 
-// Data metrik performa
-const overallAccuracy = ref(87.5)
-const precision = ref(89.2)
-const recall = ref(85.8)
-const f1Score = ref(87.4)
+onMounted(() => {
+  const metricsRef = doc(db, "system", "metrics");
+
+  onSnapshot(metricsRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data() as {
+        akurasi: number;
+        precision: number;
+        recall: number;
+        f1score: number;
+      };
+      overallAccuracy.value = data.akurasi;
+      precision.value = data.precision;
+      recall.value = data.recall;
+      f1Score.value = data.f1score;
+
+      metrics.value = data;
+      console.log("📊 Metrics loaded:", data);
+    } else {
+      console.warn("⚠️ Metrics document not found");
+    }
+  });
+});
+
+
 </script>
 
 <template>

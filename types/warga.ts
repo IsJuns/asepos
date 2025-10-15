@@ -11,4 +11,6 @@ export interface Warga {
   rw: number
   skorKelayakan?: number // Opsional, karena mungkin belum dihitung
   timestamp?: Date // Opsional, jika ada timestamp
+  status_aktual?: string; // label sebenarnya (ground truth)
+  hasil_sistem?: string; // hasil prediksi sistem
 }
