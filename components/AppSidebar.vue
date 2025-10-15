@@ -58,14 +58,14 @@ const mainMenuItems = [
 ]
 
 // Menu API Reference
-const apiItems = [
-  {
-    title: "Components",
-    url: "#",
-    icon: BarChart3,
-    description: "Komponen sistem"
-  },
-]
+// const apiItems = [
+//   {
+//     title: "Components",
+//     url: "#",
+//     icon: BarChart3,
+//     description: "Komponen sistem"
+//   },
+// ]
 
 // ✅ BARU: Menu Konfigurasi
 const configItems = [
@@ -81,7 +81,7 @@ const configItems = [
 const accountItems = [
   {
     title: "Settings",
-    url: "#", // Ini bisa diarahkan ke halaman pengaturan umum jika ada
+    url: "/settings/accountSetting", // Ini bisa diarahkan ke halaman pengaturan umum jika ada
     icon: Settings,
     description: "Pengaturan sistem"
   },
@@ -161,7 +161,7 @@ const accountItems = [
       </SidebarGroupContent>
     </SidebarGroup>
 
-    <!-- API Reference Section -->
+    <!-- API Reference Section
     <SidebarGroup>
       <SidebarGroupLabel>API Reference</SidebarGroupLabel>
       <SidebarGroupContent>
@@ -176,7 +176,7 @@ const accountItems = [
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroupContent>
-    </SidebarGroup>
+    </SidebarGroup> -->
 
     <!-- ✅ BARU: Configuration Section -->
     <SidebarGroup>
