@@ -36,6 +36,7 @@
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@types/xlsx": "^0.0.35",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

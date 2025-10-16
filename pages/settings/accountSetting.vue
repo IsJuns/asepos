@@ -278,7 +278,35 @@ onMounted(async () => {
           <!-- Performance Metrics -->
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Metrik Performa Sistem</h2>
-            
+
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+              <h3 class="font-semibold text-emerald-900 mb-2 text-sm">Cara Kerja Perhitungan Metrik:</h3>
+              <div class="text-xs text-emerald-800 space-y-2">
+                <div>
+                  <strong>1. Akurasi:</strong> Persentase prediksi yang benar dari semua data
+                  <div class="bg-white p-2 mt-1 rounded font-mono text-xs">Akurasi = (Prediksi Benar / Total Data) × 100%</div>
+                </div>
+                <div>
+                  <strong>2. Precision:</strong> Dari yang diprediksi positif, berapa yang benar-benar positif
+                  <div class="bg-white p-2 mt-1 rounded font-mono text-xs">Precision = TP / (TP + FP) × 100%</div>
+                </div>
+                <div>
+                  <strong>3. Recall (Sensitivity):</strong> Dari yang sebenarnya positif, berapa yang berhasil terdeteksi
+                  <div class="bg-white p-2 mt-1 rounded font-mono text-xs">Recall = TP / (TP + FN) × 100%</div>
+                </div>
+                <div>
+                  <strong>4. F1-Score:</strong> Rata-rata harmonis antara Precision dan Recall
+                  <div class="bg-white p-2 mt-1 rounded font-mono text-xs">F1-Score = 2 × (Precision × Recall) / (Precision + Recall)</div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-emerald-300">
+                  <strong>Keterangan:</strong><br>
+                  TP (True Positive) = Prediksi benar untuk kelas positif<br>
+                  FP (False Positive) = Salah prediksi sebagai positif<br>
+                  FN (False Negative) = Salah prediksi sebagai negatif
+                </div>
+              </div>
+            </div>
+
             <!-- Overall Performance -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div class="text-center p-4 bg-emerald-50 rounded-lg">
@@ -302,6 +330,17 @@ onMounted(async () => {
             <!-- Confusion Matrix -->
             <div class="mb-6">
               <h3 class="font-semibold text-gray-900 mb-3">Matriks Konfusi</h3>
+
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h4 class="font-semibold text-blue-900 mb-2 text-sm">Penjelasan Matriks Konfusi:</h4>
+                <div class="text-xs text-blue-800 space-y-2">
+                  <p><strong>Baris (Prediksi):</strong> Hasil klasifikasi yang diprediksi oleh sistem SMART berdasarkan skor kelayakan</p>
+                  <p><strong>Kolom (Aktual):</strong> Label sebenarnya dari data ground truth atau validasi ahli</p>
+                  <p><strong>Diagonal (highlight):</strong> Prediksi yang benar. Semakin tinggi nilai diagonal, semakin akurat sistem</p>
+                  <p><strong>Off-diagonal:</strong> Kesalahan klasifikasi. Nilai ini menunjukkan di mana sistem melakukan kesalahan</p>
+                </div>
+              </div>
+
               <div class="overflow-x-auto">
                 <table class="min-w-full border border-gray-300">
                   <thead class="bg-gray-50">
@@ -333,6 +372,10 @@ onMounted(async () => {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              <div class="mt-3 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                <strong>Contoh Pembacaan:</strong> Jika sel [Layak, Pertimbangan] = 2, artinya ada 2 warga yang diprediksi "Layak" oleh sistem, tetapi sebenarnya masuk kategori "Pertimbangan"
               </div>
             </div>
           </div>
@@ -373,6 +416,198 @@ onMounted(async () => {
               <p><strong>Expert Validation:</strong> Divalidasi oleh pembuat sistem</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Penjelasan Detail Metrik dengan Accordion -->
+      <div class="mt-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-4">Penjelasan Detail Metrik Evaluasi</h2>
+
+          <Accordion type="single" collapsible class="w-full">
+            <AccordionItem value="akurasi">
+              <AccordionTrigger>Akurasi - Tingkat Ketepatan Keseluruhan</AccordionTrigger>
+              <AccordionContent>
+                <div class="space-y-3 text-sm">
+                  <p><strong>Definisi:</strong> Akurasi mengukur seberapa sering sistem membuat prediksi yang benar dari keseluruhan data.</p>
+
+                  <div class="bg-emerald-50 p-3 rounded">
+                    <strong>Rumus:</strong>
+                    <div class="font-mono mt-2">Akurasi = (Jumlah Prediksi Benar / Total Semua Data) × 100%</div>
+                  </div>
+
+                  <div class="bg-blue-50 p-3 rounded">
+                    <strong>Contoh Perhitungan:</strong>
+                    <p class="mt-2">Dari 150 data warga:</p>
+                    <ul class="list-disc list-inside ml-3 mt-1">
+                      <li>Prediksi benar: 147 warga</li>
+                      <li>Prediksi salah: 3 warga</li>
+                    </ul>
+                    <p class="mt-2 font-mono">Akurasi = (147 / 150) × 100% = <strong class="text-emerald-600">98%</strong></p>
+                  </div>
+
+                  <p><strong>Interpretasi:</strong> Akurasi {{ metrics.akurasi }}% berarti sistem membuat prediksi yang benar sebanyak {{ metrics.akurasi }} kali dari 100 prediksi.</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="precision">
+              <AccordionTrigger>Precision - Ketepatan Prediksi Positif</AccordionTrigger>
+              <AccordionContent>
+                <div class="space-y-3 text-sm">
+                  <p><strong>Definisi:</strong> Precision mengukur dari semua yang diprediksi "Layak", berapa persen yang benar-benar layak.</p>
+
+                  <div class="bg-blue-50 p-3 rounded">
+                    <strong>Rumus:</strong>
+                    <div class="font-mono mt-2">Precision = TP / (TP + FP) × 100%</div>
+                    <div class="mt-2 text-xs">
+                      <strong>TP (True Positive):</strong> Diprediksi Layak, sebenarnya Layak ✓<br>
+                      <strong>FP (False Positive):</strong> Diprediksi Layak, sebenarnya Tidak Layak ✗
+                    </div>
+                  </div>
+
+                  <div class="bg-yellow-50 p-3 rounded">
+                    <strong>Contoh Kasus:</strong>
+                    <p class="mt-2">Sistem memprediksi 50 warga sebagai "Layak":</p>
+                    <ul class="list-disc list-inside ml-3 mt-1">
+                      <li>45 warga benar-benar layak (TP = 45)</li>
+                      <li>5 warga ternyata tidak layak (FP = 5)</li>
+                    </ul>
+                    <p class="mt-2 font-mono">Precision = (45 / (45 + 5)) × 100% = <strong class="text-blue-600">90%</strong></p>
+                  </div>
+
+                  <p><strong>Pentingnya Precision:</strong> Precision tinggi berarti sedikit orang yang salah diberi bantuan (mengurangi kebocoran anggaran).</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="recall">
+              <AccordionTrigger>Recall - Kemampuan Mendeteksi yang Layak</AccordionTrigger>
+              <AccordionContent>
+                <div class="space-y-3 text-sm">
+                  <p><strong>Definisi:</strong> Recall mengukur dari semua yang sebenarnya "Layak", berapa persen yang berhasil dideteksi sistem.</p>
+
+                  <div class="bg-purple-50 p-3 rounded">
+                    <strong>Rumus:</strong>
+                    <div class="font-mono mt-2">Recall = TP / (TP + FN) × 100%</div>
+                    <div class="mt-2 text-xs">
+                      <strong>TP (True Positive):</strong> Diprediksi Layak, sebenarnya Layak ✓<br>
+                      <strong>FN (False Negative):</strong> Diprediksi Tidak Layak, sebenarnya Layak ✗
+                    </div>
+                  </div>
+
+                  <div class="bg-yellow-50 p-3 rounded">
+                    <strong>Contoh Kasus:</strong>
+                    <p class="mt-2">Dari data aktual ada 48 warga yang benar-benar layak:</p>
+                    <ul class="list-disc list-inside ml-3 mt-1">
+                      <li>45 warga berhasil terdeteksi sistem (TP = 45)</li>
+                      <li>3 warga terlewat/tidak terdeteksi (FN = 3)</li>
+                    </ul>
+                    <p class="mt-2 font-mono">Recall = (45 / (45 + 3)) × 100% = <strong class="text-purple-600">93.75%</strong></p>
+                  </div>
+
+                  <p><strong>Pentingnya Recall:</strong> Recall tinggi berarti sedikit orang layak yang terlewat (memastikan bantuan tepat sasaran).</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="f1score">
+              <AccordionTrigger>F1-Score - Keseimbangan Precision & Recall</AccordionTrigger>
+              <AccordionContent>
+                <div class="space-y-3 text-sm">
+                  <p><strong>Definisi:</strong> F1-Score adalah rata-rata harmonis antara Precision dan Recall, memberikan gambaran performa sistem secara seimbang.</p>
+
+                  <div class="bg-orange-50 p-3 rounded">
+                    <strong>Rumus:</strong>
+                    <div class="font-mono mt-2">F1-Score = 2 × (Precision × Recall) / (Precision + Recall)</div>
+                  </div>
+
+                  <div class="bg-yellow-50 p-3 rounded">
+                    <strong>Contoh Perhitungan:</strong>
+                    <p class="mt-2">Jika Precision = 90% dan Recall = 93.75%:</p>
+                    <div class="font-mono mt-2 text-xs">
+                      F1-Score = 2 × (0.90 × 0.9375) / (0.90 + 0.9375)<br>
+                      F1-Score = 2 × 0.84375 / 1.8375<br>
+                      F1-Score = 1.6875 / 1.8375<br>
+                      F1-Score = <strong class="text-orange-600">91.84%</strong>
+                    </div>
+                  </div>
+
+                  <div class="bg-blue-50 p-3 rounded">
+                    <strong>Interpretasi Nilai F1-Score:</strong>
+                    <ul class="list-disc list-inside ml-3 mt-2 space-y-1">
+                      <li><strong>90-100%:</strong> Sangat Baik - Sistem sangat akurat dan handal</li>
+                      <li><strong>80-89%:</strong> Baik - Sistem cukup akurat dengan sedikit kesalahan</li>
+                      <li><strong>70-79%:</strong> Cukup - Sistem perlu peningkatan</li>
+                      <li><strong>&lt;70%:</strong> Kurang - Sistem perlu perbaikan signifikan</li>
+                    </ul>
+                  </div>
+
+                  <p><strong>Pentingnya F1-Score:</strong> Metrik ini penting karena menyeimbangkan trade-off antara Precision dan Recall. Sangat berguna ketika data tidak seimbang.</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="confusion-detail">
+              <AccordionTrigger>Memahami Confusion Matrix Secara Mendalam</AccordionTrigger>
+              <AccordionContent>
+                <div class="space-y-3 text-sm">
+                  <p><strong>Apa itu Confusion Matrix?</strong></p>
+                  <p>Confusion Matrix adalah tabel yang menunjukkan performa sistem klasifikasi dengan membandingkan prediksi sistem vs kenyataan aktual.</p>
+
+                  <div class="bg-gray-50 p-3 rounded">
+                    <strong>Struktur Tabel:</strong>
+                    <ul class="list-disc list-inside ml-3 mt-2 space-y-1">
+                      <li><strong>Baris (Vertikal):</strong> Hasil PREDIKSI sistem</li>
+                      <li><strong>Kolom (Horizontal):</strong> Label AKTUAL (ground truth)</li>
+                      <li><strong>Sel Diagonal (hijau/kuning/merah):</strong> Prediksi BENAR</li>
+                      <li><strong>Sel Off-diagonal (putih):</strong> Prediksi SALAH</li>
+                    </ul>
+                  </div>
+
+                  <div class="bg-blue-50 p-3 rounded mt-3">
+                    <strong>Contoh Pembacaan Matrix:</strong>
+                    <table class="min-w-full border border-gray-300 mt-2 text-xs">
+                      <thead class="bg-white">
+                        <tr>
+                          <th class="border border-gray-300 px-2 py-1">Prediksi \\ Aktual</th>
+                          <th class="border border-gray-300 px-2 py-1">Layak</th>
+                          <th class="border border-gray-300 px-2 py-1">Pertimbangan</th>
+                          <th class="border border-gray-300 px-2 py-1">Tidak Layak</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="border border-gray-300 px-2 py-1 font-medium">Layak</td>
+                          <td class="border border-gray-300 px-2 py-1 text-center bg-emerald-100">45</td>
+                          <td class="border border-gray-300 px-2 py-1 text-center">2</td>
+                          <td class="border border-gray-300 px-2 py-1 text-center">1</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div class="mt-2 space-y-1">
+                      <p>• <strong>45:</strong> Sistem prediksi "Layak", aktual "Layak" ✓ (BENAR)</p>
+                      <p>• <strong>2:</strong> Sistem prediksi "Layak", aktual "Pertimbangan" ✗ (SALAH - terlalu tinggi)</p>
+                      <p>• <strong>1:</strong> Sistem prediksi "Layak", aktual "Tidak Layak" ✗ (SALAH - sangat tinggi)</p>
+                    </div>
+                  </div>
+
+                  <div class="bg-yellow-50 p-3 rounded mt-3">
+                    <strong>Analisis Kesalahan:</strong>
+                    <ul class="list-disc list-inside ml-3 mt-2 space-y-1">
+                      <li><strong>False Positive:</strong> Warga diprediksi layak, padahal tidak → bantuan salah sasaran</li>
+                      <li><strong>False Negative:</strong> Warga sebenarnya layak, tapi tidak terdeteksi → warga layak terlewat</li>
+                    </ul>
+                  </div>
+
+                  <div class="bg-emerald-50 p-3 rounded mt-3">
+                    <strong>Matrix Ideal:</strong>
+                    <p class="mt-2">Matrix yang ideal memiliki nilai tinggi pada diagonal dan nilai 0 atau sangat kecil pada off-diagonal, menunjukkan sistem sangat akurat dengan minim kesalahan.</p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
   </div>
