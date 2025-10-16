@@ -1,50 +1,19 @@
 <script setup lang="ts">
-import { definePageMeta, ref, onMounted, useNuxtApp } from "#imports";
+import { definePageMeta, ref, onMounted, useNuxtApp, computed } from "#imports";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { doc, onSnapshot } from "firebase/firestore";
-import { collection, getDocs } from "firebase/firestore"
+import { useSystemMetrics } from '@/composables/useSystemMetrics'
 
 definePageMeta({
   title: 'Settings',
   middleware: ['auth'],
 })
 
-// Ambil db dari Nuxt plugin
-const { $firebase } = useNuxtApp();
-const db = $firebase.db; // ✅ akses Firestore dari plugin
-
-type Label = 'layak' | 'pertimbangan' | 'tidakLayak';
-
-const confusionMatrix: Record<Label, Record<Label, number>> = {
-  layak: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
-  pertimbangan: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
-  tidakLayak: { layak: 0, pertimbangan: 0, tidakLayak: 0 },
-};
-
-
-const fetchConfusionMatrix = async () => {
-  const wargaRef = collection(db, "warga")
-  const querySnap = await getDocs(wargaRef)
-  const data = querySnap.docs.map((d) => d.data())
-
-  // Hitung confusion matrix dari data sebenarnya
-  data.forEach((d: any) => {
-    const actual = d.kelayakan_aktual
-    const predicted = d.kelayakan_prediksi
-
-    if (confusionMatrix[predicted as Label] && confusionMatrix[predicted as Label][actual as Label] !== undefined) {
-      confusionMatrix[predicted as Label][actual as Label]++;
-}
-
-  })
-
-  console.log("✅ Confusion Matrix Updated:", confusionMatrix)
-}
+const { metrics, confusionMatrix, isLoading, totalSamples, fetchMetrics, calculateConfusionMatrix } = useSystemMetrics()
 
 // Contoh state untuk pengaturan
 const smartWeightPenghasilan = ref(0.4)
@@ -55,11 +24,10 @@ const smartWeightPekerjaan = ref(0.2)
 const thresholdLayak = ref(0.8)
 const thresholdPertimbangan = ref(0.4)
 
-const overallAccuracy = ref(0);
-const precision = ref(0);
-const recall = ref(0);
-const f1Score = ref(0);
-const metrics = ref<any>(null);
+const currentDate = computed(() => {
+  const date = new Date();
+  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+});
 
 const saveSettings = () => {
   // Logika untuk menyimpan pengaturan ke database atau konfigurasi
@@ -83,28 +51,9 @@ useHead({
   ]
 })
 
-onMounted(() => {
-  const metricsRef = doc(db, "system", "metrics");
-
-  onSnapshot(metricsRef, (docSnap) => {
-    if (docSnap.exists()) {
-      const data = docSnap.data() as {
-        akurasi: number;
-        precision: number;
-        recall: number;
-        f1score: number;
-      };
-      overallAccuracy.value = data.akurasi;
-      precision.value = data.precision;
-      recall.value = data.recall;
-      f1Score.value = data.f1score;
-
-      metrics.value = data;
-      console.log("📊 Metrics loaded:", data);
-    } else {
-      console.warn("⚠️ Metrics document not found");
-    }
-  });
+onMounted(async () => {
+  fetchMetrics();
+  await calculateConfusionMatrix();
 });
 
 
@@ -333,19 +282,19 @@ onMounted(() => {
             <!-- Overall Performance -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div class="text-center p-4 bg-emerald-50 rounded-lg">
-                <div class="text-2xl font-bold text-emerald-600">{{ overallAccuracy }}%</div>
+                <div class="text-2xl font-bold text-emerald-600">{{ metrics.akurasi }}%</div>
                 <div class="text-sm text-emerald-800">Akurasi</div>
               </div>
               <div class="text-center p-4 bg-blue-50 rounded-lg">
-                <div class="text-2xl font-bold text-blue-600">{{ precision }}%</div>
+                <div class="text-2xl font-bold text-blue-600">{{ metrics.precision }}%</div>
                 <div class="text-sm text-blue-800">Precision</div>
               </div>
               <div class="text-center p-4 bg-purple-50 rounded-lg">
-                <div class="text-2xl font-bold text-purple-600">{{ recall }}%</div>
+                <div class="text-2xl font-bold text-purple-600">{{ metrics.recall }}%</div>
                 <div class="text-sm text-purple-800">Recall</div>
               </div>
               <div class="text-center p-4 bg-orange-50 rounded-lg">
-                <div class="text-2xl font-bold text-orange-600">{{ f1Score }}%</div>
+                <div class="text-2xl font-bold text-orange-600">{{ metrics.f1score }}%</div>
                 <div class="text-sm text-orange-800">F1-Score</div>
               </div>
             </div>
@@ -366,21 +315,21 @@ onMounted(() => {
                   <tbody>
                     <tr>
                       <td class="border border-gray-300 px-4 py-2 font-medium bg-gray-50">Layak</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center bg-emerald-100 font-bold">45</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">2</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">1</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center bg-emerald-100 font-bold">{{ confusionMatrix.Layak?.Layak || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix.Layak?.Pertimbangan || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix.Layak?.['Tidak Layak'] || 0 }}</td>
                     </tr>
                     <tr>
                       <td class="border border-gray-300 px-4 py-2 font-medium bg-gray-50">Pertimbangan</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">3</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center bg-yellow-100 font-bold">73</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">4</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix.Pertimbangan?.Layak || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center bg-yellow-100 font-bold">{{ confusionMatrix.Pertimbangan?.Pertimbangan || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix.Pertimbangan?.['Tidak Layak'] || 0 }}</td>
                     </tr>
                     <tr>
                       <td class="border border-gray-300 px-4 py-2 font-medium bg-gray-50">Tidak Layak</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">0</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center">1</td>
-                      <td class="border border-gray-300 px-4 py-2 text-center bg-red-100 font-bold">29</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix['Tidak Layak']?.Layak || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center">{{ confusionMatrix['Tidak Layak']?.Pertimbangan || 0 }}</td>
+                      <td class="border border-gray-300 px-4 py-2 text-center bg-red-100 font-bold">{{ confusionMatrix['Tidak Layak']?.['Tidak Layak'] || 0 }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -405,11 +354,11 @@ onMounted(() => {
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600">Data Training</span>
-                <span class="text-sm font-medium">147 sampel</span>
+                <span class="text-sm font-medium">{{ totalSamples }} sampel</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600">Update Terakhir</span>
-                <span class="text-sm font-medium">25 Jul 2025</span>
+                <span class="text-sm font-medium">{{ currentDate }}</span>
               </div>
             </div>
           </div>

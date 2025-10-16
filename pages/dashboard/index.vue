@@ -15,6 +15,7 @@ import { useDashboardData } from '@/composables/useDashboardData'
 import { collection, addDoc } from 'firebase/firestore'
 import { useNuxtApp } from '#app'
 import { doc, setDoc, getDocs } from "firebase/firestore";
+import { useSystemMetrics } from '@/composables/useSystemMetrics';
 
 const { $firebase } = useNuxtApp()
 const db = $firebase.db
@@ -30,6 +31,8 @@ const {
   recentWarga,
   fetchDashboardData
 } = useDashboardData()
+
+const { calculateConfusionMatrix } = useSystemMetrics()
 
 const importFileInput = ref<HTMLInputElement | null>(null)
 
@@ -136,11 +139,9 @@ const calculateSystemMetrics = async () => {
     const wargaSnapshot = await getDocs(collection(db, "data_warga"));
     const wargaData = wargaSnapshot.docs.map((doc) => doc.data() as Warga);
 
-    // Data ground truth (label sebenarnya) dan prediksi (hasil sistem)
     const trueLabels = wargaData.map((w) => w.status_aktual);
     const predictedLabels = wargaData.map((w) => w.hasil_sistem);
 
-    // Definisi kelas dan confusion matrix
     const classes = ["Layak", "Pertimbangan", "Tidak Layak"];
     const matrix: Record<string, Record<string, number>> = {
       Layak: { Layak: 0, Pertimbangan: 0, "Tidak Layak": 0 },
@@ -148,7 +149,6 @@ const calculateSystemMetrics = async () => {
       "Tidak Layak": { Layak: 0, Pertimbangan: 0, "Tidak Layak": 0 },
     };
 
-    // Loop semua data warga
     for (let i = 0; i < trueLabels.length; i++) {
       const actual: string = trueLabels[i] ? String(trueLabels[i]) : "Tidak Layak";
       const predicted: string = predictedLabels[i] ? String(predictedLabels[i]) : "Tidak Layak";
@@ -158,12 +158,10 @@ const calculateSystemMetrics = async () => {
       }
     }
 
-    // Hitung metrik dasar
     const total = trueLabels.length;
     const correct = trueLabels.filter((v, i) => v === predictedLabels[i]).length;
     const akurasi = ((correct / total) * 100).toFixed(1);
 
-    // Precision, Recall, F1-score (rata-rata per kelas)
     let precisionSum = 0,
       recallSum = 0,
       f1Sum = 0;
@@ -186,7 +184,6 @@ const calculateSystemMetrics = async () => {
     const recall = ((recallSum / classes.length) * 100).toFixed(1);
     const f1score = ((f1Sum / classes.length) * 100).toFixed(1);
 
-    // Simpan ke Firestore
     const metricsRef = doc(db, "system", "metrics");
     await setDoc(metricsRef, {
       akurasi: parseFloat(akurasi),
@@ -194,14 +191,18 @@ const calculateSystemMetrics = async () => {
       recall: parseFloat(recall),
       f1score: parseFloat(f1score),
       confusionMatrix: matrix,
+      totalSamples: total,
       updatedAt: new Date(),
     });
+
+    await calculateConfusionMatrix();
 
     console.log("✅ Metrik sistem berhasil diperbarui:", {
       akurasi,
       precision,
       recall,
       f1score,
+      totalSamples: total,
     });
   } catch (error) {
     console.error("❌ Gagal menghitung metrik sistem:", error);
